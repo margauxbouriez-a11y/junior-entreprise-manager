@@ -293,14 +293,7 @@
       ...data.food.map((f) => ({ ...f, kind: 'food', label: `Stand ${f.name}` })),
     ].map((x) => ({ ...x, ...slot(x) })).sort((a, b) => a.startAt - b.startAt);
   }
-  function until(date) {
-    const min = Math.round((date - new Date()) / 60000);
-    if (min < 60) return `dans ${Math.max(1, min)} min`;
-    const h = Math.floor(min / 60);
-    if (h < 24) return `dans ${h} h${min % 60 ? ` ${String(min % 60).padStart(2, '0')}` : ''}`;
-    const d = Math.round(h / 24);
-    return `dans ${d} jour${d > 1 ? 's' : ''}`;
-  }
+
 
   // ================= FACE ÉTUDIANTS =================
   let selectedDay = null;
@@ -326,39 +319,7 @@
     $('#hero-kicker').textContent = `${tagline ? `${tagline} · ` : ''}Campagne du ${fmtShort(days[0])} au ${fmtShort(days[days.length - 1])}`;
   }
 
-  function renderLive() {
-    const now = new Date();
-    const slots = allSlots();
-    const current = slots.filter((s) => s.startAt <= now && now < s.endAt);
-    const next = slots.find((s) => s.startAt > now);
-    const days = campaignDays();
-    const first = parseDay(days[0]);
-    const dayIndex = Math.floor((parseDay(todayIso) - first) / 864e5);
-    let progressLabel; let pct;
-    if (dayIndex < 0) { progressLabel = `Lancement ${until(first)}`; pct = 0; }
-    else if (dayIndex >= days.length) { progressLabel = 'Campagne terminée — merci à tous'; pct = 100; }
-    else { progressLabel = `Jour ${dayIndex + 1} sur ${days.length}`; pct = ((dayIndex + 1) / days.length) * 100; }
 
-    let main;
-    if (current.length) {
-      const c = current[0];
-      main = `<div class="live-head"><span class="pulse">En ce moment</span><span>jusqu'à ${esc(c.endAt.toTimeString().slice(0, 5).replace(':', 'h'))}</span></div>
-        <div class="live-title">${esc(c.label)}</div>
-        <div class="live-meta">${esc(c.place)}${current.length > 1 ? ` · et ${current.length - 1} autre${current.length > 2 ? 's' : ''} en parallèle` : ''}</div>`;
-    } else if (next) {
-      main = `<div class="live-head"><span class="pulse idle">Prochain rendez-vous</span><span>${esc(until(next.startAt))}</span></div>
-        <div class="live-title">${esc(next.label)}</div>
-        <div class="live-meta">${esc(fmtLong(next.date))} · ${esc(next.start.replace(':', 'h'))} · ${esc(next.place)}</div>`;
-    } else {
-      main = `<div class="live-head"><span class="pulse idle">Programme</span></div>
-        <div class="live-title">À très vite.</div><div class="live-meta">Le programme complet arrive bientôt.</div>`;
-    }
-    const after = current.length && next
-      ? `<div class="live-next"><span>Ensuite</span><span><b>${esc(next.label)}</b> · ${esc(until(next.startAt))}</span></div>` : '';
-    $('#live').innerHTML = `${main}${after}
-      <div class="progress"><div class="progress-bar"><span style="width:${pct}%"></span></div>
-      <div class="progress-label"><span>${esc(progressLabel)}</span><span>${days.length} jours</span></div></div>`;
-  }
 
   // « Comment ça marche » : les 4 usages du site, avec une info en direct pour chacun
   function renderQuick() {
@@ -949,7 +910,7 @@
   }
 
   function renderPublic() {
-    renderHeader(); renderLive(); renderDays(); renderAgenda(); renderFoodGrid(); renderServices(); renderMembersPublic(); renderRequests(); renderQuick();
+    renderHeader(); renderDays(); renderAgenda(); renderFoodGrid(); renderServices(); renderMembersPublic(); renderRequests(); renderQuick();
   }
   function renderAll() { renderPublic(); renderAdmin(); }
 
@@ -1200,7 +1161,7 @@
   }
 
   // Le bloc « En ce moment » et le programme du jour suivent l'heure
-  setInterval(() => { if (view === 'public') { renderLive(); renderAgenda(); renderQuick(); } }, 60000);
+  setInterval(() => { if (view === 'public') { renderAgenda(); renderQuick(); } }, 60000);
 
   renderAll();
   setView(view);
