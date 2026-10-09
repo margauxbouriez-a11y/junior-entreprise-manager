@@ -11,7 +11,7 @@ Adresse une fois publiée : https://margauxbouriez-a11y.github.io/junior-entrepr
 - `app.js` — le fonctionnement.
 
 ## Face étudiants
-- **Accueil** : le logo et le message de la campagne, puis « Comment ça marche » : les 4 usages du site (Programme, Food, Demandes, Équipe) avec une info en direct pour chacun.
+- **Accueil** : le logo et le message de la campagne, puis « Comment ça marche » : les 4 usages du site (Programme, Food, Boutique, Équipe) avec une info en direct pour chacun.
 - Le logo est dans `assets/` (`logo.jpg`, `logo-180.png`, `favicon.png`) : remplacez ces fichiers pour le changer.
 - **Programme** : les 2 semaines de campagne jour par jour (événements + stands food).
 - **Food** : chaque stand avec la date, le lieu, le prix et une jauge des portions restantes.
@@ -25,6 +25,7 @@ Code d'accès par défaut : `leclercq2026` (modifiable dans Réglages). Il chiff
 - **Stocks food** : un produit par carte, rangé par catégorie (Food, Boissons, Matériel…), avec boutons +/−, seuil d'alerte, filtre « À racheter » et liste de courses générée.
 - **Où sont les membres** : une carte par membre ; un clic pour changer de statut (Disponible, Occupé·e, En pause, Absent·e), un champ pour la position (avec suggestions des lieux connus), et l'heure de la dernière mise à jour.
 - **Budget** : recettes et dépenses, solde, plafond, dépenses par poste.
+- **Boutique** : catalogue des articles offerts, limite par commande, disponibilité, ouverture ou fermeture de la boutique.
 - **Stands food**, **E-mails**, **Événements et services**, **Réglages**.
 
 ## Publier les modifications (publication automatique)
@@ -44,27 +45,20 @@ Sans clé, les modifications restent sur l'appareil ; le bouton **Exporter data.
 
 **Données privées :** dans `data.js`, le budget, les stocks, les abonnés et les campagnes e-mail sont **chiffrés avec le code d'accès** de l'Espace liste (`leclercq2026` par défaut, à changer dans Réglages, 8 caractères minimum). Sans le code, ces données sont illisibles, même en ouvrant le fichier. Si vous changez le code, prévenez tous les membres. Si vous le perdez, la partie privée est perdue.
 
-## Demandes des étudiants (crêpe, Red Bull, ménage…) via n8n
-La section **Demandes** du site envoie chaque demande à un webhook n8n. n8n l'envoie par mail à l'adresse de la liste et répond automatiquement à l'étudiant.
+## Boutique : commandes offertes (boissons, crêpes, ménage…) via n8n
+Dans la section **Commander**, les étudiants ajoutent des articles à leur commande, en respectant une limite par article (par exemple 2 Red Bull au maximum), puis indiquent où les livrer et valident. **Tout est offert, il n'y a aucun paiement.** Chaque commande reçoit un numéro (`LQ-1015-4821`) et part vers un webhook n8n, qui :
+- envoie un mail à la liste avec le détail. Pour écrire à l'étudiant, il suffit de répondre à ce mail ;
+- envoie un récapitulatif à l'étudiant.
 
-**1. Importer le workflow dans n8n**
-1. Dans n8n : **Create workflow**, puis menu **⋯ → Import from File**, et choisissez `n8n/demandes-workflow.json`.
-2. Ouvrez **Mail à la liste** : choisissez votre compte Gmail dans *Credential*, et remplacez `ADRESSE-DE-LA-LISTE@gmail.com` par l'adresse de la liste.
-3. Ouvrez **Accusé de réception** et choisissez le même compte Gmail.
-4. **Save** puis **Publish** (ou passez le workflow en *Active*).
-5. Ouvrez **Demande reçue**, onglet **Production URL**, et copiez l'adresse (elle se termine par `/webhook/leclercq-demandes`).
+**Gérer le catalogue :** Espace liste → onglet **Boutique**. On peut y ajouter, modifier ou supprimer des produits, régler le maximum par commande, et décocher « Dispo » quand un produit est épuisé. On peut aussi ouvrir ou fermer toute la boutique.
 
-**2. Brancher le site**
-1. Sur le site : **Espace liste → Réglages → Webhook des demandes**, collez l'URL, puis **Enregistrer**.
-2. **Exporter data.js**, puis remplacez `data.js` sur GitHub pour que tous les étudiants l'aient.
+**Brancher n8n :**
+1. Dans n8n : **Create workflow → ⋯ → Import from File**, puis choisissez `n8n/commandes-workflow.json`.
+2. Dans **Mail à la liste** et **Récapitulatif à l'étudiant**, choisissez votre compte Gmail. Remplacez `ADRESSE-DE-LA-LISTE@gmail.com` par les adresses qui doivent recevoir les commandes (plusieurs possibles, séparées par des virgules, adresses HEC comprises).
+3. **Save**, puis **Publish**. Copiez la **Production URL** du nœud « Commande reçue ».
+4. Sur le site : **Espace liste → Boutique → Webhook des commandes**, collez l'URL, puis **Enregistrer**.
 
-**3. Tester** : faites une demande depuis le site. Vous devez recevoir le mail, et l'étudiant son accusé de réception. En cas de souci, regardez l'onglet **Executions** du workflow.
-
-Pour répondre à un étudiant, il suffit de répondre au mail reçu : la réponse part directement à son adresse.
-
-Les types de demandes se modifient dans **Réglages → Types de demandes**, à raison d'un par ligne au format `Nom | description | quantité (oui/non)`. Exemple : `Café | Livré chaud | oui`.
-
-Tant qu'aucun webhook n'est réglé, le formulaire ouvre la messagerie de l'étudiant vers l'e-mail de contact de la liste. Si aucun e-mail de contact n'est réglé non plus, il indique que les demandes ne sont pas encore ouvertes.
+Tant qu'aucun webhook n'est réglé, la commande ouvre la messagerie de l'étudiant vers l'e-mail de contact de la liste. Sans e-mail de contact non plus, le site indique que les commandes ne sont pas encore ouvertes.
 
 ## Inscriptions e-mail
 Pour recevoir les inscriptions des étudiants de tous les appareils, renseignez dans **Réglages** l'URL d'un webhook (n8n, Zapier, Google Apps Script…). La plateforme y envoie `{ email, name, date, list }` en JSON.

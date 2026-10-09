@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Leclercq des étoiles — Campagne HEC</title>
-<meta name="description" content="Leclercq des étoiles, liste HEC Paris : le programme de la campagne, les stands food, les demandes et l'équipe, en direct.">
+<meta name="description" content="Leclercq des étoiles, liste HEC Paris : le programme de la campagne, les stands food, la boutique et l'équipe, en direct.">
 <link rel="icon" href="assets/favicon.png">
 <link rel="apple-touch-icon" href="assets/logo-180.png">
 <meta property="og:image" content="assets/logo.jpg">
@@ -266,31 +266,64 @@
   .member .where small { display: block; color: var(--ink-3); font-size: 0.74rem; margin-top: 2px; }
   .member-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 
-  /* Demandes */
+  /* Boutique */
   .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-  .req { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 24px; align-items: start; }
-  .req-types { border: 0; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-  .req-tile { position: relative; cursor: pointer; }
-  .req-tile input { position: absolute; opacity: 0; pointer-events: none; }
-  .req-tile .tile {
-    display: flex; flex-direction: column; justify-content: space-between; gap: 18px; min-height: 150px; padding: 18px;
-    border: 1px solid var(--line); border-radius: 18px; background: var(--card); transition: border-color .2s, background .2s, color .2s, transform .15s;
+  .shop-closed { padding: 16px 20px; border-radius: 14px; background: var(--warn-soft); color: var(--warn); font-weight: 600; margin-bottom: 20px; }
+  .shop-bar { display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 22px; }
+  .shop-pay { font-size: 0.86rem; color: var(--ink-2); }
+  .products { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
+  .product {
+    display: flex; flex-direction: column; gap: 8px; padding: 22px; border-radius: 20px; border: 1px solid var(--line);
+    background: linear-gradient(180deg, rgba(10, 22, 80, .9), rgba(4, 12, 52, .9)); transition: border-color .2s, transform .2s;
   }
-  .req-tile:hover .tile { border-color: var(--ink-3); transform: translateY(-2px); }
-  .req-tile .tile b { font: 700 1.35rem/1.15 var(--serif); letter-spacing: -0.02em; }
-  .req-tile .tile small { font-size: 0.84rem; color: var(--ink-2); }
-  .req-tile .tile .no { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.16em; color: var(--ink-3); display: flex; justify-content: space-between; }
-  .req-tile .tile .no::after { content: ""; width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--line); }
-  .req-tile input:checked + .tile { background: linear-gradient(160deg, var(--blue), var(--royal)); color: #fff; border-color: var(--accent); box-shadow: 0 0 36px -14px rgba(0, 0, 255, .9); }
-  .req-tile input:checked + .tile small, .req-tile input:checked + .tile .no { color: rgba(255, 255, 255, .8); }
-  .req-tile input:checked + .tile .no::after { border-color: var(--accent); background: var(--accent); box-shadow: inset 0 0 0 4px var(--royal); }
-  .req-tile input:focus-visible + .tile { outline: 2px solid var(--accent); outline-offset: 2px; }
-  .req-card { background: var(--card); border: 1px solid var(--line); border-radius: 22px; padding: 26px; }
-  .req-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 14px; }
-  .req .field > span em { font-style: normal; text-transform: none; letter-spacing: 0; font-weight: 400; }
-  .req input, .req textarea { padding: 12px 14px; }
-  .req-foot { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 6px; }
-  .req-foot .note { margin: 0; flex: 1; min-width: 200px; }
+  .product:hover { border-color: rgba(245, 197, 66, .45); transform: translateY(-2px); }
+  .product.in-cart { border-color: var(--accent); box-shadow: 0 0 36px -18px rgba(245, 197, 66, .7); }
+  .product.off { opacity: .5; }
+  .product-cat { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-3); }
+  .product h3 { font: 700 1.3rem/1.2 var(--serif); letter-spacing: -0.02em; }
+  .product p { margin: 0; color: var(--ink-2); font-size: 0.9rem; }
+  .product-foot { margin-top: auto; padding-top: 14px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .free { display: inline-flex; flex-direction: column; font: 700 0.8rem var(--sans); letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); }
+  .free small { font: 500 0.76rem var(--sans); letter-spacing: 0; text-transform: none; color: var(--ink-3); margin-top: 3px; }
+  .stepper { display: inline-flex; align-items: center; gap: 4px; padding: 3px; border-radius: 999px; background: var(--paper-2); border: 1px solid var(--line); }
+  .stepper button { width: 32px; height: 32px; border-radius: 50%; border: 0; background: var(--card); color: var(--ink); font: 700 1rem var(--sans); cursor: pointer; }
+  .stepper button:hover { background: var(--accent); color: var(--accent-ink); }
+  .stepper b { min-width: 24px; text-align: center; font-variant-numeric: tabular-nums; }
+
+  .cart-fab {
+    position: fixed; right: 22px; bottom: 22px; z-index: 40; display: inline-flex; align-items: center; gap: 12px;
+    padding: 13px 18px; border-radius: 999px; border: 1px solid var(--accent); cursor: pointer;
+    background: linear-gradient(180deg, var(--accent-2), var(--accent)); color: var(--accent-ink); font: 600 0.92rem var(--sans);
+    box-shadow: 0 10px 40px -8px rgba(245, 197, 66, .7);
+  }
+  .cart-fab svg { width: 20px; height: 20px; }
+  .drawer { position: fixed; inset: 0; z-index: 60; }
+  .drawer-backdrop { position: absolute; inset: 0; background: rgba(1, 4, 20, .7); backdrop-filter: blur(3px); }
+  .drawer-panel {
+    position: absolute; top: 0; right: 0; bottom: 0; width: min(460px, 100%); display: flex; flex-direction: column;
+    background: var(--night-2); border-left: 1px solid rgba(245, 197, 66, .3); box-shadow: -30px 0 80px rgba(0, 0, 0, .5);
+  }
+  .drawer-head { display: flex; justify-content: space-between; align-items: center; padding: 20px 22px; border-bottom: 1px solid var(--line); }
+  .drawer-head h3 { font: 700 1.3rem var(--serif); letter-spacing: -0.02em; }
+  .drawer-x { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line); background: transparent; color: var(--ink); cursor: pointer; font-size: 0.9rem; }
+  .drawer-body { flex: 1; overflow-y: auto; padding: 18px 22px 28px; }
+  .drawer-sub { font: 700 1rem var(--serif); margin: 22px 0 12px; color: var(--accent); }
+  .cart-line { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .cart-line b { font-weight: 600; }
+  .cart-line small { display: block; color: var(--ink-3); font-size: 0.8rem; }
+  .cart-line .line-total { font-variant-numeric: tabular-nums; font-weight: 600; min-width: 64px; text-align: right; }
+  .cart-total { display: flex; justify-content: space-between; align-items: baseline; padding: 16px 0 4px; font: 700 1.25rem var(--serif); }
+  .cart-total span:last-child { color: var(--accent); font-size: 1rem; letter-spacing: 0.08em; text-transform: uppercase; }
+  .cart-empty { color: var(--ink-3); padding: 20px 0; }
+  .order-submit { width: 100%; margin-top: 18px; padding: 15px 20px; font-size: 0.95rem; }
+  .order-submit:disabled { opacity: .6; cursor: wait; }
+  .done { text-align: center; padding: 20px 0; }
+  .done-badge { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; margin: 0 auto 14px; background: var(--ok-soft); color: var(--ok); font-size: 1.8rem; border: 1px solid var(--ok); }
+  .done h4 { font: 700 1.4rem var(--serif); margin: 0; }
+  .done .order-no { display: inline-block; margin: 10px 0 4px; padding: 6px 12px; border-radius: 8px; background: var(--paper-2); font: 600 1rem var(--serif); color: var(--accent); letter-spacing: 0.04em; }
+  .done-recap { text-align: left; margin: 18px 0; }
+  .check-row { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; font-size: 0.92rem; }
+  .check-row input { width: auto; accent-color: var(--accent); }
   .note.ok { color: var(--ok); } .note.err { color: var(--bad); }
   .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
 
@@ -472,9 +505,9 @@
   }
   @media (max-width: 640px) {
     .wrap { padding: 0 18px; }
-    .req-grid { grid-template-columns: 1fr; }
-    .req-tile .tile { min-height: 120px; }
-    .req-card { padding: 20px 16px; }
+    .products { grid-template-columns: 1fr; }
+    .cart-fab { left: 16px; right: 16px; bottom: 16px; justify-content: center; }
+    .drawer-body { padding: 16px 16px 28px; }
     section { padding: 72px 0; }
     .hero { padding: 42px 0 96px; }
     .hero-lede br { display: none; }
@@ -508,7 +541,7 @@
       <li><a href="#food">Food</a></li>
       <li><a href="#services">Services</a></li>
       <li><a href="#equipe">L'équipe</a></li>
-      <li><a href="#demandes">Demandes</a></li>
+      <li><a href="#commander">Commander</a></li>
     </ul></nav>
     <button class="btn btn-outline-light btn-sm" id="switch-btn" type="button">Espace liste</button>
   </div>
@@ -523,11 +556,10 @@
         <div class="eyebrow" id="hero-kicker">HEC Paris · Campagne</div>
         <p class="crawl">Il y a bien longtemps, sur un campus pas si lointain…</p>
         <h1 class="hero-title"><span class="sr-only" id="hero-name">Leclercq des étoiles — </span>Deux semaines pour faire <i>briller</i> le campus.</h1>
-        <p class="hero-lede">Programme, stands food, demandes et équipe : toute la campagne de la liste est ici, mise à jour en direct par ses membres.</p>
+        <p class="hero-lede">Programme, stands food, commandes en ligne et équipe : toute la campagne de la liste est ici, mise à jour en direct par ses membres.</p>
         <div class="hero-cta">
-          <a class="btn btn-accent" href="#programme">Voir le programme
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
-          <a class="btn btn-outline-light" href="#comment">Comment ça marche</a>
+          <a class="btn btn-accent" href="#commander">Commander <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+          <a class="btn btn-outline-light" href="#programme">Voir le programme</a>
         </div>
       </div>
       <div class="hero-logo"><img src="assets/logo.jpg" alt="Logo de la liste Leclercq des étoiles" width="900" height="900"></div>
@@ -602,37 +634,51 @@
     </div>
   </section>
 
-  <section id="demandes">
+  <section id="commander">
     <div class="wrap">
       <div class="s-head reveal">
-        <div class="s-num"><em>05</em> — Demandes</div>
+        <div class="s-num"><em>05</em> — Boutique</div>
         <div>
-          <h2>Un besoin ? <i>On s'en charge.</i></h2>
-          <p>Une crêpe, un Red Bull, un ménage de chambre… Choisissez, dites-nous où vous êtes : la demande arrive directement dans la boîte mail de la liste.</p>
+          <h2>Commandez, <i>on livre.</i></h2>
+          <p id="shop-intro">Boissons, crêpes, services : tout est offert par la liste. Choisissez, validez, et un membre de la liste vous livre.</p>
         </div>
       </div>
-      <form class="req" id="request-form" novalidate>
-        <fieldset class="req-types" id="req-types"><legend class="sr-only">Type de demande</legend></fieldset>
-        <div class="req-card">
-          <div class="req-grid">
-            <label class="field"><span>Prénom et nom</span><input name="name" required autocomplete="name"></label>
-            <label class="field"><span>E-mail</span><input name="email" type="email" required autocomplete="email" placeholder="prenom.nom@hec.edu"></label>
-            <label class="field"><span>Téléphone <em>(facultatif)</em></span><input name="phone" type="tel" autocomplete="tel"></label>
-            <label class="field"><span>Où êtes-vous ?</span><input name="where" required placeholder="Chambre 214, bâtiment…"></label>
-            <label class="field"><span>Quand ?</span><input name="when" placeholder="Dès que possible"></label>
-            <label class="field" id="req-qty"><span>Quantité</span><input name="quantity" type="number" min="1" max="50" value="1"></label>
-          </div>
-          <label class="field"><span>Précisions <em>(facultatif)</em></span><textarea name="details" rows="3" placeholder="Nutella-banane, sans sucre, porte au fond du couloir…"></textarea></label>
-          <label class="hp" aria-hidden="true">Ne pas remplir<input name="website" tabindex="-1" autocomplete="off"></label>
-          <div class="req-foot">
-            <button class="btn btn-accent" type="submit">Envoyer la demande
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
-            <p class="note" id="request-status" role="status"></p>
-          </div>
-        </div>
-      </form>
+      <div class="shop-closed" id="shop-closed" hidden>La boutique est fermée pour le moment. Revenez très vite !</div>
+      <div class="shop-bar">
+        <div class="seg" id="shop-cats"></div>
+        <span class="shop-pay" id="shop-pay"></span>
+      </div>
+      <div class="products" id="products"></div>
     </div>
   </section>
+
+  <button class="cart-fab" id="cart-fab" type="button" hidden aria-haspopup="dialog">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2.5 3.5h3l2.4 11.2a1.6 1.6 0 0 0 1.6 1.3h8.3a1.6 1.6 0 0 0 1.6-1.2L21.5 8H6.3"/></svg><span>Ma commande · <b id="cart-count">0</b></span>
+  </button>
+  <div class="drawer" id="cart" hidden>
+    <div class="drawer-backdrop" data-close-cart></div>
+    <aside class="drawer-panel" role="dialog" aria-modal="true" aria-labelledby="cart-title">
+      <header class="drawer-head"><h3 id="cart-title">Votre commande</h3><button class="drawer-x" type="button" data-close-cart aria-label="Fermer">✕</button></header>
+      <div class="drawer-body">
+        <div id="cart-step">
+          <div id="cart-items"></div>
+          <form id="order-form" novalidate>
+            <h4 class="drawer-sub">Vos coordonnées</h4>
+            <label class="field"><span>Prénom et nom</span><input name="name" required autocomplete="name"></label>
+            <label class="field"><span>E-mail</span><input name="email" type="email" required autocomplete="email" placeholder="prenom.nom@hec.edu"></label>
+            <label class="field"><span>Téléphone</span><input name="phone" type="tel" required autocomplete="tel"></label>
+            <label class="field"><span>Où vous livrer ?</span><input name="where" required placeholder="Chambre 214, bâtiment…"></label>
+            <label class="field"><span>Quand ?</span><input name="when" placeholder="Dès que possible"></label>
+            <label class="field"><span>Précisions <em>(facultatif)</em></span><textarea name="notes" rows="2" placeholder="Allergies, code de la porte…"></textarea></label>
+            <label class="hp" aria-hidden="true">Ne pas remplir<input name="website" tabindex="-1" autocomplete="off"></label>
+            <button class="btn btn-accent order-submit" type="submit" id="order-submit">Valider la commande</button>
+            <p class="note" id="order-status" role="status"></p>
+          </form>
+        </div>
+        <div id="order-done" hidden></div>
+      </div>
+    </aside>
+  </div>
 
   <section class="news" id="newsletter">
     <div class="wrap">
@@ -688,6 +734,7 @@
       <button data-tab="stock">Stocks food</button>
       <button data-tab="members">Où sont les membres</button>
       <button data-tab="budget">Budget</button>
+      <button data-tab="shop">Boutique</button>
       <button data-tab="food">Stands food</button>
       <button data-tab="emails">E-mails</button>
       <button data-tab="events">Événements</button>
@@ -794,9 +841,39 @@
         <label class="field"><span>Début</span><input name="start" type="time" required></label>
         <label class="field"><span>Fin</span><input name="end" type="time" required></label>
         <label class="field"><span>Lieu</span><input name="place" required></label>
-        <label class="field"><span>Prix</span><input name="price" placeholder="1 €, Gratuit…"></label>
+        <label class="field"><span>Prix</span><input name="price" value="Gratuit"></label>
         <label class="field"><span>Portions prévues</span><input name="planned" type="number" min="0" required></label>
         <button class="btn" type="submit">Ajouter</button>
+      </form>
+    </div>
+
+    <!-- Boutique -->
+    <div data-panel="shop" hidden>
+      <div class="grid grid-2">
+        <form id="shop-form" class="card panel">
+          <h3>Réglages de la boutique</h3>
+          <label class="check-row"><input type="checkbox" name="ordersOpen"> <span>Boutique ouverte (les étudiants peuvent commander)</span></label>
+          <label class="field"><span>Webhook des commandes (URL de production n8n)</span><input name="orderWebhook" type="url" placeholder="https://….app.n8n.cloud/webhook/leclercq-commandes"></label>
+          <label class="field"><span>Infos de livraison affichées aux étudiants</span><input name="deliveryNote" placeholder="Livraison en chambre ou au stand, sur le campus."></label>
+          <div class="toolbar"><button class="btn" type="submit">Enregistrer</button></div>
+          <p class="note" id="shop-status"></p>
+        </form>
+        <div class="card panel">
+          <h3>Comment arrivent les commandes ?</h3>
+          <p class="muted" style="margin-top:0">Chaque commande part vers le webhook n8n, qui envoie un mail à la liste (avec le numéro de commande et le détail) et un récapitulatif à l'étudiant. Le workflow prêt à importer est dans <code>n8n/commandes-workflow.json</code>.</p>
+          <p class="muted">Pour suspendre un produit (rupture, stand fermé), décochez « Dispo » dans le catalogue : il apparaît « Épuisé » sur le site.</p>
+        </div>
+      </div>
+      <h3 class="sub-head">Catalogue</h3>
+      <div class="table-wrap"><table id="products-table"></table></div>
+      <h3 class="sub-head">Ajouter un produit ou un service</h3>
+      <form id="product-form" class="form-grid card panel">
+        <label class="field"><span>Nom</span><input name="name" required placeholder="Crêpe Nutella"></label>
+        <label class="field"><span>Catégorie</span><input name="category" list="product-cats" required placeholder="Food, Boissons, Services…"></label>
+        <label class="field"><span>Maximum par commande</span><input name="max" type="number" min="1" max="50" value="2" required></label>
+        <label class="field"><span>Description</span><input name="desc" placeholder="Courte description"></label>
+        <button class="btn" type="submit">Ajouter</button>
+        <datalist id="product-cats"></datalist>
       </form>
     </div>
 
@@ -870,8 +947,6 @@
         <label class="field" style="margin-top:12px"><span>Plafond de budget (€)</span><input name="budgetCap" type="number" min="0" step="1"></label>
         <label class="field"><span>E-mail de contact de la liste</span><input name="contactEmail" type="email"></label>
         <label class="field"><span>Instagram (sans @)</span><input name="instagram"></label>
-        <label class="field"><span>Webhook des demandes (URL de production n8n)</span><input name="requestWebhook" type="url" placeholder="https://….app.n8n.cloud/webhook/leclercq-demandes"></label>
-        <label class="field"><span>Types de demandes — un par ligne : Nom | description | quantité (oui/non)</span><textarea name="requestTypes" rows="5"></textarea></label>
         <label class="field"><span>Webhook d'inscription e-mail (n8n, Zapier, Google Apps Script…)</span><input name="signupWebhook" type="url" placeholder="https://…"></label>
         <label class="field"><span>Code d'accès à l'espace liste</span><input name="adminCode" required minlength="8" autocomplete="off"></label>
         <p class="faint" style="margin:-4px 0 14px">Ce code protège le budget, les stocks et les adresses des abonnés : ils sont chiffrés avec lui. Si vous le changez, prévenez tous les membres.</p>

@@ -263,7 +263,7 @@
   const STEP_ICON = {
     programme: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18M8 14h3M8 17h6"/></svg>',
     food: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11h16a8 8 0 0 1-16 0z"/><path d="M8 7c0-1.5 1-2 1-3M12 7c0-1.5 1-2 1-3M16 7c0-1.5 1-2 1-3"/></svg>',
-    demandes: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 6.6L21 9l-5.2 4.3L17.6 20 12 16.3 6.4 20l1.8-6.7L3 9l6.6-.4z"/></svg>',
+    demandes: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2.5 3.5h3l2.4 11.2a1.6 1.6 0 0 0 1.6 1.3h8.3a1.6 1.6 0 0 0 1.6-1.2L21.5 8H6.3"/></svg>',
     equipe: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6.5 6.5 0 0 1 3.5 5.5"/></svg>',
   };
 
@@ -340,8 +340,9 @@
       ? `${nextFood.startAt <= now ? 'Ouvert' : nextFood.date === todayIso ? "Aujourd'hui" : short(nextFood.date)} : ${esc(nextFood.name)} · ${num(foodLevel(nextFood).left)} portions`
       : 'Stands bientôt annoncés';
 
-    const types = requestTypes().map((t) => t.label);
-    const reqLive = types.length ? esc(types.slice(0, 3).join(' · ') + (types.length > 3 ? '…' : '')) : 'Bientôt ouvert';
+    const avail = products().filter((x) => x.available !== false);
+    const reqLive = !shopOpen() ? 'Boutique fermée pour le moment'
+      : avail.length ? esc(avail.slice(0, 3).map((x) => x.name).join(' · ') + (avail.length > 3 ? '…' : '')) : 'Catalogue bientôt en ligne';
 
     const dispo = data.members.filter((m) => m.status === 'dispo').length;
     const teamLive = `${dispo} membre${dispo > 1 ? 's' : ''} disponible${dispo > 1 ? 's' : ''} en ce moment`;
@@ -349,7 +350,7 @@
     const steps = [
       { href: '#programme', icon: 'programme', title: 'Consultez le programme', text: 'Chaque jour de la campagne, les événements et les stands food, heure par heure.', live: progLive, cta: 'Voir le programme' },
       { href: '#food', icon: 'food', title: 'Repérez la food', text: 'Les stands, leurs horaires et le nombre de portions restantes, en temps réel.', live: foodLive, cta: 'Voir les stands' },
-      { href: '#demandes', icon: 'demandes', title: 'Faites une demande', text: 'Choisissez, dites où vous êtes : la demande arrive aussitôt chez la liste.', live: reqLive, cta: 'Faire une demande', featured: true },
+      { href: '#commander', icon: 'demandes', title: 'Commandez, c\'est offert', text: 'Boissons, crêpes, ménage : ajoutez à votre commande, la liste vous livre gratuitement.', live: reqLive, cta: 'Ouvrir la boutique', featured: true },
       { href: '#equipe', icon: 'equipe', title: 'Trouvez un membre', text: 'Qui est où, qui est disponible, et un bouton pour l\'appeler directement.', live: teamLive, cta: "Voir l'équipe" },
     ];
     $('#quick').innerHTML = steps.map((st, i) => `
@@ -468,75 +469,159 @@
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
   }
 
-  // ---------- Demandes ----------
-  let reqType = null;
-  const requestTypes = () => (Array.isArray(data.requestTypes) ? data.requestTypes : []);
+  // ---------- Boutique (tout est offert) ----------
+  const CART_KEY = 'leclercq-cart';
+  const products = () => (Array.isArray(data.products) ? data.products : []);
+  const productCats = () => [...new Set(products().map((x) => x.category || 'Autres'))];
+  const maxOf = (prod) => Math.max(1, Number(prod.max) || 1);
+  let shopCat = 'Tout';
+  let cart = (() => { try { return JSON.parse(storage.get(CART_KEY)) || {}; } catch { return {}; } })();
+  const saveCart = () => storage.set(CART_KEY, JSON.stringify(cart));
+  const cartLines = () => Object.entries(cart)
+    .map(([id, qty]) => ({ prod: products().find((x) => x.id === id), qty }))
+    .filter((l) => l.prod && l.prod.available !== false && l.qty > 0);
+  const cartCount = () => cartLines().reduce((n, l) => n + l.qty, 0);
+  const shopOpen = () => data.config.ordersOpen !== false;
 
-  function renderRequests() {
-    const types = requestTypes();
-    $('#demandes').hidden = !types.length;
-    if (!types.length) return;
-    if (!types.some((t) => t.id === reqType)) reqType = types[0].id;
-    $('#req-types').innerHTML = '<legend class="sr-only">Type de demande</legend>' + types.map((t, i) => `
-      <label class="req-tile"><input type="radio" name="type" value="${esc(t.id)}" ${t.id === reqType ? 'checked' : ''}>
-        <span class="tile"><span class="no">${String(i + 1).padStart(2, '0')}</span><span><b>${esc(t.label)}</b><br><small>${esc(t.desc || '')}</small></span></span>
-      </label>`).join('');
-    $('#req-qty').hidden = !(types.find((t) => t.id === reqType) || {}).qty;
+  function setQty(id, qty) {
+    const prod = products().find((x) => x.id === id);
+    if (!prod) return;
+    const q = Math.max(0, Math.min(maxOf(prod), qty));
+    if (q) cart[id] = q; else delete cart[id];
+    saveCart();
+    renderShop(); renderCart();
   }
-  $('#req-types').addEventListener('change', (e) => {
-    if (e.target.name !== 'type') return;
-    reqType = e.target.value;
-    $('#req-qty').hidden = !(requestTypes().find((t) => t.id === reqType) || {}).qty;
+
+  function renderShop() {
+    const cats = productCats();
+    if (shopCat !== 'Tout' && !cats.includes(shopCat)) shopCat = 'Tout';
+    $('#commander').hidden = !products().length;
+    $('#shop-closed').hidden = shopOpen();
+    $('#shop-pay').textContent = data.config.deliveryNote || '';
+    $('#shop-cats').innerHTML = (cats.length > 1 ? ['Tout', ...cats] : []).map((c) =>
+      `<button type="button" data-shopcat="${esc(c)}" class="${c === shopCat ? 'on' : ''}">${esc(c)}</button>`).join('');
+    const list = products().filter((x) => shopCat === 'Tout' || (x.category || 'Autres') === shopCat);
+    $('#products').innerHTML = list.map((prod) => {
+      const qty = cart[prod.id] || 0;
+      const off = prod.available === false || !shopOpen();
+      const action = off
+        ? `<span class="chip">${prod.available === false ? 'Épuisé' : 'Fermé'}</span>`
+        : qty
+          ? `<span class="stepper"><button type="button" data-cart="${esc(prod.id)}" data-delta="-1" aria-label="Retirer">−</button><b>${qty}</b><button type="button" data-cart="${esc(prod.id)}" data-delta="1" aria-label="Ajouter" ${qty >= maxOf(prod) ? 'disabled' : ''}>+</button></span>`
+          : `<button class="btn btn-accent btn-sm" type="button" data-cart="${esc(prod.id)}" data-delta="1">Ajouter</button>`;
+      return `<article class="product ${qty ? 'in-cart' : ''} ${off ? 'off' : ''}">
+        <span class="product-cat">${esc(prod.category || '')}</span>
+        <h3>${esc(prod.name)}</h3>
+        ${prod.desc ? `<p>${esc(prod.desc)}</p>` : ''}
+        <div class="product-foot"><span class="free">Offert<small>${maxOf(prod)} max. par commande</small></span>${action}</div>
+      </article>`;
+    }).join('') || '<div class="empty" style="grid-column:1/-1">Le catalogue arrive bientôt.</div>';
+    const n = cartCount();
+    $('#cart-count').textContent = n;
+    $('#cart-fab').hidden = !n || !shopOpen() || view !== 'public';
+  }
+
+  function renderCart() {
+    const lines = cartLines();
+    $('#cart-items').innerHTML = lines.length ? lines.map((l) => `
+      <div class="cart-line">
+        <div><b>${esc(l.prod.name)}</b><small>${esc(l.prod.category || '')} · ${maxOf(l.prod)} max.</small></div>
+        <span class="stepper"><button type="button" data-cart="${esc(l.prod.id)}" data-delta="-1" aria-label="Retirer">−</button><b>${l.qty}</b><button type="button" data-cart="${esc(l.prod.id)}" data-delta="1" aria-label="Ajouter" ${l.qty >= maxOf(l.prod) ? 'disabled' : ''}>+</button></span>
+        <span class="line-total">Offert</span>
+      </div>`).join('') + `<div class="cart-total"><span>${cartCount()} article${cartCount() > 1 ? 's' : ''}</span><span>Tout est offert</span></div>`
+      : '<p class="cart-empty">Votre commande est vide. Ajoutez des articles depuis la boutique.</p>';
+    $('#order-form').hidden = !lines.length;
+  }
+
+  function openCart() {
+    $('#cart-step').hidden = false; $('#order-done').hidden = true;
+    $('#order-status').textContent = '';
+    renderCart();
+    $('#cart').hidden = false;
+    document.body.style.overflow = 'hidden';
+    setTimeout(() => $('.drawer-x').focus(), 0);
+  }
+  function closeCart() {
+    $('#cart').hidden = true;
+    document.body.style.overflow = '';
+  }
+  $('#cart-fab').addEventListener('click', openCart);
+  $('#cart').addEventListener('click', (e) => { if (e.target.closest('[data-close-cart]')) closeCart(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#cart').hidden) closeCart(); });
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-cart]');
+    if (b) { setQty(b.dataset.cart, (cart[b.dataset.cart] || 0) + Number(b.dataset.delta)); return; }
+    const c = e.target.closest('[data-shopcat]');
+    if (c) { shopCat = c.dataset.shopcat; renderShop(); }
   });
 
-  $('#request-form').addEventListener('submit', async (e) => {
+  const orderNumber = () => {
+    const d = new Date();
+    return `LQ-${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}-${Math.floor(1000 + Math.random() * 9000)}`;
+  };
+
+  $('#order-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const form = e.target;
-    const status = $('#request-status');
+    const status = $('#order-status');
     status.className = 'note';
+    const lines = cartLines();
+    if (!lines.length) return;
     if (!form.reportValidity()) return;
-    const type = requestTypes().find((t) => t.id === reqType) || { id: 'autre', label: 'Demande' };
+    const id = orderNumber();
+    const itemsText = lines.map((l) => `${l.qty} × ${l.prod.name}`).join('\n');
     const payload = {
-      type: type.id,
-      typeLabel: type.label,
+      orderId: id,
+      items: itemsText,
+      itemsJson: JSON.stringify(lines.map((l) => ({ id: l.prod.id, name: l.prod.name, qty: l.qty }))),
+      count: String(cartCount()),
       name: form.name.value.trim(),
       email: form.email.value.trim(),
       phone: form.phone.value.trim(),
       where: form.where.value.trim(),
       when: form.when.value.trim() || 'Dès que possible',
-      quantity: type.qty ? String(Math.max(1, Number(form.quantity.value) || 1)) : '',
-      details: form.details.value.trim(),
+      notes: form.notes.value.trim(),
       website: form.website.value,
       list: data.config.listName,
       sentAt: new Date().toISOString(),
     };
-    // Champ piège rempli = robot : on fait semblant que tout va bien
-    if (payload.website) { form.reset(); status.textContent = 'Demande envoyée.'; return; }
+    const done = () => {
+      cart = {}; saveCart(); form.reset();
+      $('#cart-step').hidden = true;
+      $('#order-done').hidden = false;
+      $('#order-done').innerHTML = `<div class="done">
+        <div class="done-badge">✓</div>
+        <h4>Commande envoyée !</h4>
+        <div class="order-no">${esc(id)}</div>
+        <p class="muted">Un membre de la liste vous livre ${esc(payload.where)} (${esc(payload.when.toLowerCase())}).${payload.email ? ' Un récapitulatif part par e-mail.' : ''}</p>
+        <div class="done-recap">${lines.map((l) => `<div class="cart-line" style="grid-template-columns:1fr auto"><b>${esc(l.prod.name)}</b><span>× ${l.qty}</span></div>`).join('')}</div>
+        <button class="btn btn-ghost" type="button" data-close-cart>Fermer</button>
+      </div>`;
+      renderShop();
+    };
+    if (payload.website) { done(); return; } // robot : on fait semblant
 
-    const hook = data.config.requestWebhook;
-    const btn = form.querySelector('button[type=submit]');
+    const hook = data.config.orderWebhook;
     if (!hook) {
       const mail = data.config.contactEmail;
-      if (!mail) { status.className = 'note err'; status.textContent = "Les demandes ne sont pas encore ouvertes. Revenez très vite !"; return; }
-      const body = [`Demande : ${payload.typeLabel}${payload.quantity ? ` × ${payload.quantity}` : ''}`, `Nom : ${payload.name}`,
-        `E-mail : ${payload.email}`, `Téléphone : ${payload.phone || '—'}`, `Où : ${payload.where}`, `Quand : ${payload.when}`, '', payload.details].join('\n');
-      location.href = `mailto:${encodeURIComponent(mail)}?subject=${encodeURIComponent(`[Demande] ${payload.typeLabel} — ${payload.name}`)}&body=${encodeURIComponent(body)}`;
-      status.textContent = 'Votre messagerie va s\'ouvrir avec la demande prête à envoyer.';
+      if (!mail) { status.className = 'note err'; status.textContent = "Les commandes ne sont pas encore ouvertes. Revenez très vite !"; return; }
+      const body = [`Commande ${id}`, '', itemsText, '', `Nom : ${payload.name}`, `E-mail : ${payload.email}`, `Téléphone : ${payload.phone}`,
+        `Où : ${payload.where}`, `Quand : ${payload.when}`, payload.notes ? `Précisions : ${payload.notes}` : ''].join('\n');
+      location.href = `mailto:${encodeURIComponent(mail)}?subject=${encodeURIComponent(`[Commande ${id}] ${payload.name}`)}&body=${encodeURIComponent(body)}`;
+      done();
       return;
     }
+    const btn = $('#order-submit');
     btn.disabled = true;
-    status.textContent = 'Envoi en cours…';
+    status.textContent = 'Envoi de la commande…';
     try {
       await postToWebhook(hook, payload);
-      form.reset();
-      renderRequests();
-      status.className = 'note ok';
-      status.textContent = `C'est noté ! Votre demande « ${payload.typeLabel} » est bien arrivée. Un membre de la liste revient vers vous très vite${payload.email ? ' (confirmation envoyée par e-mail)' : ''}.`;
+      done();
     } catch {
       status.className = 'note err';
       status.innerHTML = data.config.contactEmail
-        ? `Oups, la demande n'est pas partie. Réessayez, ou écrivez-nous à <a href="mailto:${esc(data.config.contactEmail)}">${esc(data.config.contactEmail)}</a>.`
-        : "Oups, la demande n'est pas partie. Réessayez dans un instant.";
+        ? `La commande n'est pas partie. Réessayez, ou écrivez-nous à <a href="mailto:${esc(data.config.contactEmail)}">${esc(data.config.contactEmail)}</a>.`
+        : "La commande n'est pas partie. Réessayez dans un instant.";
     } finally {
       btn.disabled = false;
     }
@@ -591,6 +676,7 @@
     $('#public-nav').style.visibility = v === 'public' ? 'visible' : 'hidden';
     $('#switch-btn').textContent = v === 'public' ? 'Espace liste' : 'Voir le site';
     $('#foot-mark').hidden = v !== 'public';
+    renderShop();
     $('#login-box').hidden = isAdmin;
     $('#admin-app').hidden = !isAdmin;
     if (v === 'admin' && history.replaceState) history.replaceState(null, '', '#liste');
@@ -889,28 +975,44 @@
     }).join('') + '</div>' : '<p class="ov-empty">Aucun stand prévu.</p>';
   }
 
+  function renderShopAdmin() {
+    const f = $('#shop-form');
+    if (!f.contains(document.activeElement)) {
+      f.ordersOpen.checked = data.config.ordersOpen !== false;
+      f.orderWebhook.value = data.config.orderWebhook || '';
+      f.deliveryNote.value = data.config.deliveryNote || '';
+    }
+    $('#product-cats').innerHTML = [...new Set(['Boissons', 'Food', 'Services', ...productCats()])].map((c) => `<option>${esc(c)}</option>`).join('');
+    $('#products-table').innerHTML = '<tr><th>Produit</th><th>Catégorie</th><th>Description</th><th>Max / commande</th><th>Dispo</th><th></th></tr>' + products().map((x) => `
+      <tr><td><input value="${esc(x.name)}" data-product="${x.id}" data-field="name"></td>
+        <td><input value="${esc(x.category)}" data-product="${x.id}" data-field="category" list="product-cats" style="width:120px"></td>
+        <td><input value="${esc(x.desc)}" data-product="${x.id}" data-field="desc"></td>
+        <td><input type="number" min="1" max="50" value="${esc(maxOf(x))}" data-product="${x.id}" data-field="max" style="width:80px"></td>
+        <td><input type="checkbox" ${x.available !== false ? 'checked' : ''} data-product="${x.id}" data-field="available" aria-label="Disponible"></td>
+        <td class="num">${delBtn('product', x.id)}</td></tr>`).join('');
+  }
+
   function renderSettings() {
     const f = $('#settings-form');
-    ['listName', 'tagline', 'campaignStart', 'campaignDays', 'contactEmail', 'instagram', 'requestWebhook', 'signupWebhook'].forEach((k) => { f[k].value = data.config[k] ?? ''; });
+    ['listName', 'tagline', 'campaignStart', 'campaignDays', 'contactEmail', 'instagram', 'signupWebhook'].forEach((k) => { f[k].value = data.config[k] ?? ''; });
     if (document.activeElement !== f.adminCode) f.adminCode.value = crypt ? crypt.code : '';
     const r = ghRepo();
     $('#github-repo').textContent = `${r.owner}/${r.repo}`;
     $('#github-state').textContent = token() ? 'Activée sur cet appareil.' : 'Désactivée sur cet appareil.';
     $('#github-off').hidden = !token();
     f.budgetCap.value = data.budgetCap ?? '';
-    f.requestTypes.value = requestTypes().map((t) => [t.label, t.desc || '', t.qty ? 'oui' : 'non'].join(' | ')).join('\n');
   }
 
   function renderAdmin() {
     if (!isAdmin) return;
     // Ne pas écraser un champ en cours de saisie
     const active = document.activeElement;
-    if (active && active.matches('#admin-app [data-member], #admin-app [data-qty], #admin-app [data-food]')) return;
-    renderKpis(); renderOverview(); renderBudget(); renderStock(); renderEmails(); renderFoodAdmin(); renderEventsAdmin(); renderMembersAdmin(); renderSettings();
+    if (active && active.matches('#admin-app [data-member], #admin-app [data-qty], #admin-app [data-food], #admin-app [data-product]')) return;
+    renderKpis(); renderOverview(); renderBudget(); renderStock(); renderEmails(); renderFoodAdmin(); renderShopAdmin(); renderEventsAdmin(); renderMembersAdmin(); renderSettings();
   }
 
   function renderPublic() {
-    renderHeader(); renderDays(); renderAgenda(); renderFoodGrid(); renderServices(); renderMembersPublic(); renderRequests(); renderQuick();
+    renderHeader(); renderDays(); renderAgenda(); renderFoodGrid(); renderServices(); renderMembersPublic(); renderShop(); renderQuick();
   }
   function renderAll() { renderPublic(); renderAdmin(); }
 
@@ -1010,7 +1112,7 @@
       const m = findIn('members', t.dataset.id); m.status = t.dataset.mstatus; m.updatedAt = new Date().toISOString(); save(); return;
     }
     if (t.dataset.del) {
-      const map = { budget: 'budget', stock: 'stock', food: 'food', event: 'events', service: 'services', member: 'members', campaign: 'campaigns' };
+      const map = { budget: 'budget', stock: 'stock', food: 'food', event: 'events', service: 'services', member: 'members', campaign: 'campaigns', product: 'products' };
       if (!confirm('Supprimer cet élément ?')) return;
       if (t.dataset.del === 'sub') data.subscribers = data.subscribers.filter((s) => s.email !== t.dataset.id);
       else data[map[t.dataset.del]] = data[map[t.dataset.del]].filter((x) => x.id !== t.dataset.id);
@@ -1042,11 +1144,31 @@
   });
   $('#admin-app').addEventListener('change', (e) => {
     const t = e.target;
+    if (t.dataset.product) {
+      const x = findIn('products', t.dataset.product);
+      x[t.dataset.field] = t.type === 'checkbox' ? t.checked : t.type === 'number' ? Math.max(1, Number(t.value) || 1) : t.value;
+      t.blur(); save(); return;
+    }
     if (t.dataset.qty) { findIn('stock', t.dataset.qty).quantity = Math.max(0, Number(t.value) || 0); t.blur(); save(); }
     if (t.dataset.food) { findIn('food', t.dataset.food)[t.dataset.field] = Math.max(0, Number(t.value) || 0); t.blur(); save(); }
     if (t.dataset.member) {
       const m = findIn('members', t.dataset.member); m[t.dataset.field] = t.value; m.updatedAt = new Date().toISOString(); t.blur(); save();
     }
+  });
+
+  $('#shop-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const f = e.target;
+    data.config = { ...data.config, ordersOpen: f.ordersOpen.checked, orderWebhook: f.orderWebhook.value.trim(), deliveryNote: f.deliveryNote.value.trim() };
+    save();
+    $('#shop-status').textContent = token() ? 'Enregistré et publié.' : 'Enregistré sur cet appareil.';
+  });
+  $('#product-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const d = formData(e.target);
+    if (!Array.isArray(data.products)) data.products = [];
+    data.products.push({ id: uid('p'), name: d.name.trim(), category: d.category.trim() || 'Autres', desc: d.desc.trim(), max: Math.max(1, Number(d.max) || 1), available: true });
+    e.target.reset(); save();
   });
 
   $('#settings-form').addEventListener('submit', async (e) => {
@@ -1061,13 +1183,6 @@
       try { sessionStorage.setItem(SESSION_KEY, newCode); } catch { /* ignore */ }
     }
     data.budgetCap = Number(d.budgetCap) || 0; delete d.budgetCap;
-    // « Crêpe | Sucrée ou salée | oui » → { id, label, desc, qty }
-    data.requestTypes = d.requestTypes.split('\n').map((line) => line.split('|').map((x) => x.trim())).filter(([label]) => label)
-      .map(([label, desc = '', qty = 'non'], i) => {
-        const id = label.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || `type-${i + 1}`;
-        return { id, label, desc, qty: /^(oui|yes|o|y|1|true)$/i.test(qty) };
-      });
-    delete d.requestTypes;
     data.config = { ...data.config, ...d, campaignDays: Number(d.campaignDays) };
     selectedDay = null; save();
     $('#settings-status').textContent = token() ? 'Réglages enregistrés et publiés.' : 'Réglages enregistrés sur cet appareil.';
