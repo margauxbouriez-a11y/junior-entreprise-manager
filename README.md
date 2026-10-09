@@ -6,7 +6,7 @@ Site statique : aucun serveur ni installation. Ouvrez `index.html` dans un navig
 Adresse une fois publiée : https://margauxbouriez-a11y.github.io/junior-entreprise-manager/
 
 ## Fichiers
-- `data.js` — le contenu : nom de la liste, membres, événements, stands, budget, stocks… **C'est le fichier à modifier.**
+- `data.js` — le contenu du site. Il est mis à jour automatiquement depuis l'Espace liste (voir plus bas). La partie publique (programme, food, équipe…) est lisible ; la partie privée (budget, stocks, abonnés) est chiffrée.
 - `index.html` — la mise en page et les textes fixes.
 - `app.js` — le fonctionnement.
 
@@ -20,16 +20,29 @@ Adresse une fois publiée : https://margauxbouriez-a11y.github.io/junior-entrepr
 - **Inscription e-mail** pour recevoir le programme.
 
 ## Espace liste (bouton « Espace liste », ou `#liste` à la fin de l'adresse)
-Code d'accès par défaut : `leclercq2026` (modifiable dans Réglages).
+Code d'accès par défaut : `leclercq2026` (modifiable dans Réglages). Il chiffre aussi les données privées.
 - **Aperçu** (page d'accueil de l'espace) : les stocks food à surveiller avec boutons +/−, la position et le statut de chaque membre (modifiables directement), et les stands food du jour avec le compteur de portions servies.
 - **Stocks food** : un produit par carte, rangé par catégorie (Food, Boissons, Matériel…), avec boutons +/−, seuil d'alerte, filtre « À racheter » et liste de courses générée.
 - **Où sont les membres** : une carte par membre ; un clic pour changer de statut (Disponible, Occupé·e, En pause, Absent·e), un champ pour la position (avec suggestions des lieux connus), et l'heure de la dernière mise à jour.
 - **Budget** : recettes et dépenses, solde, plafond, dépenses par poste.
 - **Stands food**, **E-mails**, **Événements et services**, **Réglages**.
 
-## Publier les modifications
-Le site n'a pas de base de données. Ce que la liste modifie est enregistré dans le navigateur utilisé.
-Pour que tous les étudiants voient les changements : **Espace liste → Exporter data.js**, puis remplacez `data.js` dans le dépôt (sur GitHub : *Add file → Upload files*).
+## Publier les modifications (publication automatique)
+Depuis l'Espace liste, chaque modification (événements, stands food, membres, stocks, budget…) peut être **mise en ligne automatiquement** pour tout le monde, en une minute environ. Les écrans publics déjà ouverts se mettent à jour tout seuls toutes les 90 secondes.
+
+**À faire une fois :**
+1. Sur GitHub : **Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token**.
+   - *Repository access* : **Only select repositories** → `junior-entreprise-manager`.
+   - *Permissions → Repository permissions* : **Contents → Read and write**.
+   - *Expiration* : la fin de la campagne.
+2. Copiez la clé (`github_pat_…`).
+3. Sur le site : **Espace liste → Réglages → Publication automatique**, collez la clé, puis **Activer sur cet appareil**.
+4. Chaque membre fait l'étape 3 sur son téléphone ou son ordinateur. Partagez la clé uniquement en privé : elle permet de modifier les fichiers de ce dépôt. Si elle fuit, supprimez-la sur GitHub et créez-en une autre.
+
+Si deux membres modifient en même temps, leurs changements sont fusionnés automatiquement.
+Sans clé, les modifications restent sur l'appareil ; le bouton **Exporter data.js** permet alors de publier à la main (remplacer `data.js` sur GitHub).
+
+**Données privées :** dans `data.js`, le budget, les stocks, les abonnés et les campagnes e-mail sont **chiffrés avec le code d'accès** de l'Espace liste (`leclercq2026` par défaut, à changer dans Réglages, 8 caractères minimum). Sans le code, ces données sont illisibles, même en ouvrant le fichier. Si vous changez le code, prévenez tous les membres. Si vous le perdez, la partie privée est perdue.
 
 ## Demandes des étudiants (crêpe, Red Bull, ménage…) via n8n
 La section **Demandes** du site envoie chaque demande à un webhook n8n. n8n l'envoie par mail à l'adresse de la liste et répond automatiquement à l'étudiant.
@@ -56,4 +69,4 @@ Tant qu'aucun webhook n'est réglé, le formulaire ouvre la messagerie de l'étu
 ## Inscriptions e-mail
 Pour recevoir les inscriptions des étudiants de tous les appareils, renseignez dans **Réglages** l'URL d'un webhook (n8n, Zapier, Google Apps Script…). La plateforme y envoie `{ email, name, date, list }` en JSON.
 
-> Le code d'accès est vérifié dans le navigateur. Il évite les modifications par erreur, mais ce n'est pas une vraie sécurité. Ne mettez pas de données sensibles dans `data.js`, car il est public.
+> Ce qui est dans la partie publique de `data.js` (événements, stands, membres et leurs téléphones…) est visible par tout le monde. Ne mettez que des informations que vous acceptez de rendre publiques.

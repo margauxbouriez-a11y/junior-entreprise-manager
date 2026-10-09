@@ -462,6 +462,14 @@
   .admin-member .foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 0.76rem; color: var(--ink-3); }
   .admin-member .foot input { width: 150px; padding: 6px 9px; font-size: 0.8rem; }
 
+  /* Réglages */
+  .settings-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+  .gh-card { border-color: rgba(245, 197, 66, .45); box-shadow: 0 0 40px -22px rgba(245, 197, 66, .6); }
+  .gh-steps { margin: 0 0 16px; padding-left: 20px; color: var(--ink-2); font-size: 0.88rem; display: grid; gap: 6px; }
+  .gh-steps code, .banner code { background: var(--paper-2); padding: 1px 6px; border-radius: 6px; font-size: 0.82rem; }
+  .link-btn { background: none; border: 0; padding: 0; color: var(--accent); font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
+  .banner.ok { border-left-color: var(--ok); background: var(--ok-soft); }
+
   /* ---------- Responsive ---------- */
   @media (max-width: 960px) {
     .hero-grid, .news .wrap { grid-template-columns: 1fr; gap: 32px; }
@@ -475,7 +483,7 @@
     .services { grid-template-columns: 1fr; }
     .service-item, .service-item + .service-item { padding: 26px 0; border-right: 0; border-bottom: 1px solid var(--line); }
     .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .grid-2, .ov-grid { grid-template-columns: 1fr; }
+    .grid-2, .ov-grid, .settings-grid { grid-template-columns: 1fr; }
     .nav ul { display: none; }
   }
   @media (max-width: 960px) {
@@ -858,7 +866,21 @@
 
     <!-- Réglages -->
     <div data-panel="settings" hidden>
-      <form id="settings-form" class="card panel" style="max-width:600px">
+      <div class="settings-grid">
+      <form id="github-form" class="card panel gh-card">
+        <h3>Publication automatique</h3>
+        <p class="muted" style="margin-top:0">Quand elle est activée, chaque modification faite ici (événements, stands food, membres, stocks…) est <b>mise en ligne automatiquement</b> pour tout le monde, en une minute environ. Chaque membre l'active une fois sur son téléphone ou son ordinateur.</p>
+        <ol class="gh-steps">
+          <li>Sur GitHub : <b>Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token</b>.</li>
+          <li>Repository access : <b>Only select repositories</b> → <code id="github-repo">…</code>. Permissions : <b>Contents → Read and write</b>. Expiration : la fin de la campagne.</li>
+          <li>Copiez la clé générée (elle commence par <code>github_pat_</code>), collez-la ci-dessous. Partagez-la aux membres de la liste en privé uniquement.</li>
+        </ol>
+        <label class="field"><span>Clé GitHub</span><input name="token" type="password" autocomplete="off" placeholder="github_pat_…"></label>
+        <div class="toolbar"><button class="btn btn-accent" type="submit">Activer sur cet appareil</button><button class="btn btn-ghost" type="button" id="github-off" hidden>Désactiver</button></div>
+        <p class="note" id="github-status"></p>
+        <p class="faint" style="margin:6px 0 0" id="github-state"></p>
+      </form>
+      <form id="settings-form" class="card panel">
         <label class="field"><span>Nom de la liste</span><input name="listName" required></label>
         <label class="field"><span>Sous-titre (école, campus…)</span><input name="tagline"></label>
         <div class="form-grid">
@@ -871,10 +893,12 @@
         <label class="field"><span>Webhook des demandes (URL de production n8n)</span><input name="requestWebhook" type="url" placeholder="https://….app.n8n.cloud/webhook/leclercq-demandes"></label>
         <label class="field"><span>Types de demandes — un par ligne : Nom | description | quantité (oui/non)</span><textarea name="requestTypes" rows="5"></textarea></label>
         <label class="field"><span>Webhook d'inscription e-mail (n8n, Zapier, Google Apps Script…)</span><input name="signupWebhook" type="url" placeholder="https://…"></label>
-        <label class="field"><span>Code d'accès à l'espace liste</span><input name="adminCode" required></label>
+        <label class="field"><span>Code d'accès à l'espace liste</span><input name="adminCode" required minlength="8" autocomplete="off"></label>
+        <p class="faint" style="margin:-4px 0 14px">Ce code protège le budget, les stocks et les adresses des abonnés : ils sont chiffrés avec lui. Si vous le changez, prévenez tous les membres.</p>
         <div class="toolbar"><button class="btn" type="submit">Enregistrer</button><button class="btn btn-danger" type="button" id="reset-btn">Revenir aux données publiées</button></div>
         <p class="note" id="settings-status"></p>
       </form>
+      </div>
     </div>
   </div>
 </main>
@@ -890,7 +914,10 @@
   </div>
 </footer>
 
-<script src="data.js"></script>
+<script>
+  // Toujours la dernière version publiée (évite le cache du navigateur et de GitHub Pages)
+  document.write('<script src="data.js?v=' + Date.now() + '"><\/script>');
+</script>
 <script src="app.js"></script>
 </body>
 </html>

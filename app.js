@@ -3,11 +3,12 @@
 
   const STORE_KEY = 'leclercq-data';
   const SESSION_KEY = 'leclercq-admin';
-  const published = window.JE_DATA;
+  let published = window.JE_DATA;
 
   // ---------- Données ----------
-  // La version publiée (data.js) est la référence. Les modifications faites dans
-  // l'Espace liste sont gardées dans ce navigateur jusqu'à l'export de data.js.
+  // data.js (publié sur le site) est la référence. Depuis l'Espace liste, chaque
+  // modification est republiée automatiquement si une clé GitHub est réglée ;
+  // sinon elle reste dans ce navigateur jusqu'à l'export de data.js.
   const clone = (o) => JSON.parse(JSON.stringify(o));
   const storage = {
     get(key) { try { return localStorage.getItem(key); } catch { return null; } },
@@ -15,19 +16,202 @@
     remove(key) { try { localStorage.removeItem(key); } catch { /* ignore */ } },
   };
 
-  function loadData() {
-    const raw = storage.get(STORE_KEY);
-    if (raw) {
-      try { return { ...clone(published), ...JSON.parse(raw) }; } catch { /* données corrompues */ }
-    }
-    return clone(published);
+  // ---------- Données publiques / privées ----------
+  // data.js contient la partie publique en clair (programme, food, équipe…) et la
+  // partie privée (budget, stocks, abonnés, campagnes) chiffrée avec le code
+  // d'accès de la liste : seuls les membres qui ont le code peuvent la lire.
+  const PRIVATE_KEYS = ['budget', 'budgetCap', 'stock', 'subscribers', 'campaigns'];
+  const PRIVATE_DEFAULTS = { budget: [], budgetCap: 0, stock: [], subscribers: [], campaigns: [] };
+  const splitData = (full) => {
+    const pub = {}; const priv = {};
+    Object.keys(full).forEach((k) => { (PRIVATE_KEYS.includes(k) ? priv : pub)[k] = full[k]; });
+    if (pub.config) { pub.config = { ...pub.config }; delete pub.config.adminCode; }
+    return { pub, priv };
+  };
+
+  // ---------- Chiffrement (AES-GCM, clé dérivée du code par PBKDF2) ----------
+  const b64 = {
+    fromBytes: (bytes) => btoa(String.fromCharCode(...new Uint8Array(bytes))),
+    toBytes: (str) => Uint8Array.from(atob(str), (c) => c.charCodeAt(0)),
+    fromText: (txt) => { const bytes = new TextEncoder().encode(txt); let s = ''; bytes.forEach((x) => { s += String.fromCharCode(x); }); return btoa(s); },
+    toText: (str) => new TextDecoder().decode(Uint8Array.from(atob(str.replace(/\s/g, '')), (c) => c.charCodeAt(0))),
+  };
+  async function deriveKey(code, saltB64) {
+    const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(code), 'PBKDF2', false, ['deriveKey']);
+    return crypto.subtle.deriveKey({ name: 'PBKDF2', hash: 'SHA-256', salt: b64.toBytes(saltB64), iterations: 210000 },
+      base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
   }
+  async function encryptPrivate(obj, crypt) {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const buf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, crypt.key, new TextEncoder().encode(JSON.stringify(obj)));
+    return { v: 1, salt: crypt.salt, iv: b64.fromBytes(iv), data: b64.fromBytes(buf) };
+  }
+  async function decryptPrivate(blob, key) {
+    const buf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64.toBytes(blob.iv) }, key, b64.toBytes(blob.data));
+    return JSON.parse(new TextDecoder().decode(buf));
+  }
+  let crypt = null; // { key, salt, code } une fois connecté
+
+  // ---------- Fichier data.js ----------
+  const FILE_HEADER = "// Données du site, publiées depuis l'Espace liste.\n// La partie JE_PRIVATE est chiffrée avec le code d'accès de la liste : ne la modifiez pas à la main.\n";
+  async function buildFile(full) {
+    const { pub, priv } = splitData(full);
+    pub.publishedAt = new Date().toISOString();
+    let text = `${FILE_HEADER}window.JE_DATA = ${JSON.stringify(pub, null, 2)};\n`;
+    if (crypt) text += `window.JE_PRIVATE = ${JSON.stringify(await encryptPrivate(priv, crypt))};\n`;
+    return { text, publishedAt: pub.publishedAt };
+  }
+  function parseFile(text) {
+    const win = {};
+    new Function('window', text)(win); // fichier du dépôt de la liste, le même que celui chargé par la page
+    if (!win.JE_DATA || !win.JE_DATA.config) throw new Error('data.js illisible');
+    return { pub: win.JE_DATA, priv: win.JE_PRIVATE || null };
+  }
+
+  // ---------- Fusion à trois voies (deux membres qui modifient en même temps) ----------
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  function mergeObj(base = {}, mine = {}, theirs = {}) {
+    const out = {};
+    new Set([...Object.keys(theirs), ...Object.keys(mine)]).forEach((k) => {
+      out[k] = !same(mine[k], base[k]) ? mine[k] : theirs[k];
+    });
+    return out;
+  }
+  function mergeList(base = [], mine = [], theirs = [], key = 'id') {
+    const m = (list) => new Map(list.map((x) => [x[key], x]));
+    const B = m(base); const L = m(mine); const R = m(theirs);
+    const ids = [...new Set([...theirs.map((x) => x[key]), ...mine.map((x) => x[key])])];
+    const out = [];
+    ids.forEach((id) => {
+      const b = B.get(id); const l = L.get(id); const r = R.get(id);
+      const lChanged = !b || !same(b, l); const rChanged = !b || !same(b, r);
+      if (l && r) out.push(lChanged && rChanged ? mergeObj(b, l, r) : lChanged ? l : r);
+      else if (l && !r) { if (!b || lChanged) out.push(l); } // supprimé ailleurs, sauf si modifié ici
+      else if (r && !l) { if (!b || rChanged) out.push(r); } // supprimé ici, sauf si modifié ailleurs
+    });
+    return out;
+  }
+  function merge3(base, mine, theirs) {
+    const out = { ...theirs };
+    Object.keys(mine).forEach((k) => {
+      if (Array.isArray(mine[k]) || Array.isArray(theirs[k])) {
+        const keyName = k === 'subscribers' ? 'email' : 'id';
+        out[k] = mergeList(base[k] || [], mine[k] || [], theirs[k] || [], keyName);
+      } else if (mine[k] && typeof mine[k] === 'object') out[k] = mergeObj(base[k], mine[k], theirs[k]);
+      else out[k] = same(mine[k], base[k]) ? theirs[k] : mine[k];
+    });
+    return out;
+  }
+
+  // ---------- Publication automatique via l'API GitHub ----------
+  const TOKEN_KEY = 'leclercq-github-token';
+  const ghRepo = () => {
+    const c = (published.config && published.config.github) || {};
+    const m = location.hostname.match(/^([^.]+)\.github\.io$/);
+    const pathRepo = location.pathname.split('/').filter(Boolean)[0];
+    return {
+      owner: c.owner || (m && m[1]) || 'margauxbouriez-a11y',
+      repo: c.repo || (m && pathRepo) || 'junior-entreprise-manager',
+      branch: c.branch || 'main',
+      path: c.path || 'data.js',
+    };
+  };
+  const token = () => storage.get(TOKEN_KEY) || '';
+  const sync = { sha: null, base: null, timer: null, busy: false, dirty: false, status: 'idle', at: null, error: '' };
+
+  async function gh(method, body) {
+    const r = ghRepo();
+    const url = `https://api.github.com/repos/${r.owner}/${r.repo}/contents/${r.path}` + (method === 'GET' ? `?ref=${encodeURIComponent(r.branch)}&t=${Date.now()}` : '');
+    const res = await fetch(url, {
+      method, cache: 'no-store',
+      headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${token()}`, 'X-GitHub-Api-Version': '2022-11-28' },
+      body: body ? JSON.stringify({ ...body, branch: r.branch }) : undefined,
+    });
+    if (!res.ok) {
+      const err = new Error(res.status === 401 ? 'Clé GitHub invalide ou expirée.'
+        : res.status === 403 || res.status === 404 ? "La clé GitHub n'a pas le droit d'écrire dans le dépôt."
+          : `GitHub a répondu ${res.status}.`);
+      err.status = res.status; throw err;
+    }
+    return res.json();
+  }
+  async function fetchRemote() {
+    const file = await gh('GET');
+    const { pub, priv } = parseFile(b64.toText(file.content));
+    let privData = { ...PRIVATE_DEFAULTS };
+    if (priv && crypt) privData = { ...privData, ...(await decryptPrivate(priv, crypt.key)) };
+    return { sha: file.sha, full: { ...pub, ...privData } };
+  }
+  function setSync(status, error = '') {
+    sync.status = status; sync.error = error;
+    if (status === 'ok') sync.at = new Date();
+    if (isAdmin) renderSyncBanner();
+  }
+  async function pullRemote() {
+    if (!token() || !crypt) return;
+    try {
+      setSync('loading');
+      const remote = await fetchRemote();
+      sync.sha = remote.sha; sync.base = clone(remote.full);
+      // Brouillon local non publié (ex. publication interrompue) : on le fusionne
+      const draft = readDraft();
+      data = draft ? merge3(draft.base || remote.full, draft.data, remote.full) : remote.full;
+      if (draft) schedulePublish(0); else setSync('ok');
+      selectedDay = null; renderAll();
+    } catch (err) { setSync('error', err.message); }
+  }
+  function schedulePublish(delay = 2500) {
+    if (!token() || !crypt) return;
+    clearTimeout(sync.timer);
+    sync.timer = setTimeout(publishNow, delay);
+    setSync('pending');
+  }
+  async function publishNow() {
+    if (sync.busy) { sync.dirty = true; return; }
+    sync.busy = true; sync.dirty = false;
+    setSync('publishing');
+    try {
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        if (!sync.sha || attempt > 0) {
+          const remote = await fetchRemote();
+          if (remote.sha !== sync.sha) { data = merge3(sync.base || remote.full, data, remote.full); sync.sha = remote.sha; sync.base = clone(remote.full); }
+        }
+        const snapshot = clone(data);
+        const { text } = await buildFile(snapshot);
+        try {
+          const res = await gh('PUT', { message: "Mise à jour du site depuis l'Espace liste", content: b64.fromText(text), sha: sync.sha });
+          sync.sha = res.content.sha; sync.base = snapshot;
+          if (same(snapshot, data)) clearDraft();
+          setSync('ok'); renderAll();
+          break;
+        } catch (err) {
+          if ((err.status === 409 || err.status === 422) && attempt < 2) continue; // quelqu'un a publié entre-temps : on fusionne et on recommence
+          throw err;
+        }
+      }
+    } catch (err) {
+      setSync('error', err.message);
+    } finally {
+      sync.busy = false;
+      if (sync.dirty) schedulePublish(500);
+    }
+  }
+
+  // Brouillon local : filet de sécurité si la publication échoue, ou mode sans clé GitHub
+  function readDraft() {
+    try { const d = JSON.parse(storage.get(STORE_KEY)); return d && d.data && d.v === 2 ? d : null; } catch { return null; }
+  }
+  function writeDraft() { storage.set(STORE_KEY, JSON.stringify({ v: 2, base: sync.base, publishedAt: published.publishedAt || '', data })); }
+  function clearDraft() { storage.remove(STORE_KEY); }
+
+  // Visiteurs : seulement la partie publique
+  const loadData = () => ({ ...clone(published), ...PRIVATE_DEFAULTS });
   let data = loadData();
-  let hasLocalChanges = !!storage.get(STORE_KEY);
+  let publishedPrivate = { ...PRIVATE_DEFAULTS };
 
   function save() {
-    storage.set(STORE_KEY, JSON.stringify(data));
-    hasLocalChanges = true;
+    writeDraft();
+    if (token() && crypt) schedulePublish();
     renderAll();
   }
 
@@ -409,10 +593,6 @@
       if (hook) {
         await postToWebhook(hook, { ...entry, list: data.config.listName });
       }
-      if (!data.subscribers.some((s) => s.email === entry.email)) {
-        data.subscribers.push(entry);
-        storage.set(STORE_KEY, JSON.stringify(data));
-      }
       form.reset();
       status.textContent = 'Merci ! Vous recevrez le programme de la campagne par e-mail.';
     } catch {
@@ -437,7 +617,8 @@
 
   // ================= FACE LISTE =================
   let isAdmin = false;
-  try { isAdmin = sessionStorage.getItem(SESSION_KEY) === '1'; } catch { /* ignore */ }
+  let savedCode = null;
+  try { savedCode = sessionStorage.getItem(SESSION_KEY); } catch { /* ignore */ }
   let view = location.hash === '#liste' ? 'admin' : 'public';
   let currentTab = 'overview';
   let stockFilter = 'Tout';
@@ -457,22 +638,53 @@
   }
   $('#switch-btn').addEventListener('click', () => setView(view === 'public' ? 'admin' : 'public'));
 
-  $('#login-form').addEventListener('submit', (e) => {
+  // Le code d'accès déchiffre la partie privée : un mauvais code ne donne rien.
+  async function unlock(code) {
+    const priv = window.JE_PRIVATE;
+    if (priv) {
+      const key = await deriveKey(code, priv.salt);
+      const privData = await decryptPrivate(priv, key); // échoue si le code est faux
+      crypt = { key, salt: priv.salt, code };
+      return { ...PRIVATE_DEFAULTS, ...privData };
+    }
+    // Ancien format (code et données privées en clair dans data.js)
+    if (!published.config.adminCode || code !== published.config.adminCode) throw new Error('Code incorrect');
+    const salt = b64.fromBytes(crypto.getRandomValues(new Uint8Array(16)));
+    crypt = { key: await deriveKey(code, salt), salt, code };
+    const legacy = {};
+    PRIVATE_KEYS.forEach((k) => { if (published[k] !== undefined) legacy[k] = published[k]; });
+    return { ...PRIVATE_DEFAULTS, ...legacy };
+  }
+  async function login(code) {
+    publishedPrivate = await unlock(code);
+    const publishedFull = { ...clone(published), ...clone(publishedPrivate) };
+    sync.base = clone(publishedFull);
+    const draft = readDraft();
+    data = draft ? merge3(draft.base || publishedFull, draft.data, publishedFull) : publishedFull;
+    isAdmin = true;
+    try { sessionStorage.setItem(SESSION_KEY, code); } catch { /* ignore */ }
+    selectedDay = null;
+    renderAll();
+    if (token()) pullRemote();
+  }
+  $('#login-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    if (e.target.code.value === data.config.adminCode) {
-      isAdmin = true;
-      try { sessionStorage.setItem(SESSION_KEY, '1'); } catch { /* ignore */ }
-      e.target.reset();
+    const form = e.target;
+    $('#login-status').textContent = 'Vérification…';
+    try {
+      await login(form.code.value);
+      form.reset();
       $('#login-status').textContent = '';
       setView('admin');
-      renderAdmin();
-    } else {
+    } catch {
       $('#login-status').textContent = 'Code incorrect.';
     }
   });
   $('#logout-btn').addEventListener('click', () => {
-    isAdmin = false;
+    isAdmin = false; crypt = null;
     try { sessionStorage.removeItem(SESSION_KEY); } catch { /* ignore */ }
+    data = loadData();
+    renderAll();
     setView('public');
   });
 
@@ -505,10 +717,29 @@
     $('#kpis').innerHTML = kpis.map(([l, n, bad]) => `<div class="card kpi"><div class="label">${l}</div><div class="num ${bad ? 'neg' : ''}">${esc(n)}</div></div>`).join('');
     const stockTab = $('#admin-tabs [data-tab="stock"]');
     stockTab.innerHTML = `Stocks food${low ? `<span class="count">${low}</span>` : ''}`;
-    $('#sync-banner').className = `banner ${hasLocalChanges ? 'warn' : ''}`;
-    $('#sync-banner').innerHTML = hasLocalChanges
-      ? '<b>Modifications locales.</b> Elles sont enregistrées dans ce navigateur. Pour que tous les étudiants les voient, cliquez sur « Exporter data.js » puis remplacez le fichier <code>data.js</code> du site.'
-      : 'Vous voyez les données publiées. Toute modification sera enregistrée dans ce navigateur jusqu\'à l\'export.';
+    renderSyncBanner();
+  }
+
+  function renderSyncBanner() {
+    const el = $('#sync-banner');
+    if (!token()) {
+      const draft = readDraft();
+      el.className = `banner ${draft ? 'warn' : ''}`;
+      el.innerHTML = `<b>Mode local.</b> ${draft ? 'Vous avez des modifications enregistrées sur cet appareil seulement.' : 'Les modifications restent sur cet appareil.'}
+        Pour qu'elles soient en ligne automatiquement pour tout le monde, <button class="link-btn" type="button" data-goto="settings">activez la publication automatique</button> (2 minutes).`;
+      return;
+    }
+    const at = sync.at ? sync.at.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
+    const msg = {
+      idle: ['ok', '<b>Publication automatique activée.</b> Chaque modification est mise en ligne pour tout le monde.'],
+      loading: ['', 'Chargement de la dernière version publiée…'],
+      pending: ['', 'Modification enregistrée, publication dans un instant…'],
+      publishing: ['', 'Publication en cours…'],
+      ok: ['ok', `<b>✓ Publié${at ? ` à ${at}` : ''}.</b> Le site est à jour pour tout le monde (visible en ligne d'ici une minute).`],
+      error: ['warn', `<b>La publication a échoué :</b> ${esc(sync.error)} Vos modifications sont gardées sur cet appareil. <button class="link-btn" type="button" data-retry="1">Réessayer</button>`],
+    }[sync.status] || ['', ''];
+    el.className = `banner ${msg[0]}`;
+    el.innerHTML = msg[1];
   }
 
   function delBtn(kind, id) { return `<button class="btn btn-danger btn-sm" data-del="${kind}" data-id="${esc(id)}" type="button">Suppr.</button>`; }
@@ -699,7 +930,12 @@
 
   function renderSettings() {
     const f = $('#settings-form');
-    ['listName', 'tagline', 'campaignStart', 'campaignDays', 'contactEmail', 'instagram', 'requestWebhook', 'signupWebhook', 'adminCode'].forEach((k) => { f[k].value = data.config[k] ?? ''; });
+    ['listName', 'tagline', 'campaignStart', 'campaignDays', 'contactEmail', 'instagram', 'requestWebhook', 'signupWebhook'].forEach((k) => { f[k].value = data.config[k] ?? ''; });
+    if (document.activeElement !== f.adminCode) f.adminCode.value = crypt ? crypt.code : '';
+    const r = ghRepo();
+    $('#github-repo').textContent = `${r.owner}/${r.repo}`;
+    $('#github-state').textContent = token() ? 'Activée sur cet appareil.' : 'Désactivée sur cet appareil.';
+    $('#github-off').hidden = !token();
     f.budgetCap.value = data.budgetCap ?? '';
     f.requestTypes.value = requestTypes().map((t) => [t.label, t.desc || '', t.qty ? 'oui' : 'non'].join(' | ')).join('\n');
   }
@@ -806,6 +1042,7 @@
   const findIn = (list, id) => data[list].find((x) => x.id === id);
   $('#admin-app').addEventListener('click', (e) => {
     const t = e.target.closest('button') || e.target;
+    if (t.dataset.retry) { publishNow(); return; }
     if (t.dataset.goto) { goTab(t.dataset.goto); window.scrollTo({ top: $('#admin-tabs').offsetTop - 80, behavior: 'smooth' }); return; }
     if (t.dataset.sfilter) { stockFilter = t.dataset.sfilter; renderStock(); return; }
     if (t.dataset.mstatus) {
@@ -851,9 +1088,17 @@
     }
   });
 
-  $('#settings-form').addEventListener('submit', (e) => {
+  $('#settings-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const d = formData(e.target);
+    // Nouveau code : on rechiffre la partie privée avec une nouvelle clé
+    const newCode = (d.adminCode || '').trim(); delete d.adminCode;
+    if (newCode && crypt && newCode !== crypt.code) {
+      if (newCode.length < 8) { $('#settings-status').textContent = 'Le code doit faire au moins 8 caractères.'; return; }
+      const salt = b64.fromBytes(crypto.getRandomValues(new Uint8Array(16)));
+      crypt = { key: await deriveKey(newCode, salt), salt, code: newCode };
+      try { sessionStorage.setItem(SESSION_KEY, newCode); } catch { /* ignore */ }
+    }
     data.budgetCap = Number(d.budgetCap) || 0; delete d.budgetCap;
     // « Crêpe | Sucrée ou salée | oui » → { id, label, desc, qty }
     data.requestTypes = d.requestTypes.split('\n').map((line) => line.split('|').map((x) => x.trim())).filter(([label]) => label)
@@ -864,33 +1109,85 @@
     delete d.requestTypes;
     data.config = { ...data.config, ...d, campaignDays: Number(d.campaignDays) };
     selectedDay = null; save();
-    $('#settings-status').textContent = 'Réglages enregistrés.';
+    $('#settings-status').textContent = token() ? 'Réglages enregistrés et publiés.' : 'Réglages enregistrés sur cet appareil.';
   });
   $('#reset-btn').addEventListener('click', () => {
-    if (!confirm('Effacer les modifications de ce navigateur et revenir aux données publiées (data.js) ?')) return;
-    storage.remove(STORE_KEY); data = clone(published); hasLocalChanges = false; selectedDay = null; renderAll();
+    if (!confirm('Effacer les modifications non publiées de cet appareil et revenir à la version en ligne ?')) return;
+    clearDraft(); data = { ...clone(published), ...clone(publishedPrivate) }; selectedDay = null; renderAll();
+    if (token()) pullRemote();
+  });
+
+  // Clé GitHub (propre à chaque appareil, jamais publiée)
+  $('#github-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const status = $('#github-status');
+    const value = e.target.token.value.trim();
+    if (!value) return;
+    storage.set(TOKEN_KEY, value);
+    status.textContent = 'Vérification de la clé…';
+    try {
+      await gh('GET');
+      e.target.reset();
+      status.textContent = '✓ Clé valide. La publication automatique est activée sur cet appareil.';
+      renderSettings(); await pullRemote();
+      if (readDraft()) schedulePublish(0);
+    } catch (err) {
+      storage.remove(TOKEN_KEY);
+      status.textContent = `Clé refusée : ${err.message}`;
+    }
+    renderSyncBanner();
+  });
+  $('#github-off').addEventListener('click', () => {
+    storage.remove(TOKEN_KEY);
+    $('#github-status').textContent = 'Publication automatique désactivée sur cet appareil.';
+    renderSettings(); renderSyncBanner();
   });
 
   // Export / import
-  $('#export-btn').addEventListener('click', () => {
-    const content = "// Données publiées de la campagne.\n// Pour mettre à jour le site public : dans l'Espace liste, cliquez sur\n// « Exporter data.js », puis remplacez ce fichier par celui téléchargé.\nwindow.JE_DATA = " + JSON.stringify(data, null, 2) + ';\n';
-    download('data.js', content, 'text/javascript');
+  $('#export-btn').addEventListener('click', async () => {
+    const { text } = await buildFile(clone(data));
+    download('data.js', text, 'text/javascript');
   });
   $('#import-file').addEventListener('change', async (e) => {
     const file = e.target.files[0]; if (!file) return;
     const text = await file.text();
     try {
-      const json = text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1);
-      const imported = JSON.parse(json);
+      let imported;
+      if (text.includes('window.JE_DATA')) {
+        const { pub, priv } = parseFile(text);
+        imported = { ...pub, ...(priv ? await decryptPrivate(priv, (await deriveKey(crypt.code, priv.salt))) : {}) };
+      } else {
+        imported = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1));
+      }
       if (!imported.config || !Array.isArray(imported.events)) throw new Error();
-      data = { ...clone(published), ...imported }; selectedDay = null; save();
+      delete imported.publishedAt;
+      data = { ...data, ...imported }; selectedDay = null; save();
       alert('Données importées.');
     } catch { alert("Fichier non reconnu : importez un data.js ou un .json exporté depuis l'Espace liste."); }
     e.target.value = '';
   });
 
   // Synchronisation entre onglets ouverts sur le même appareil (ex. tablette du stand)
-  window.addEventListener('storage', (e) => { if (e.key === STORE_KEY) { data = loadData(); hasLocalChanges = true; renderAll(); } });
+  window.addEventListener('storage', (e) => {
+    if (e.key !== STORE_KEY || !isAdmin) return;
+    const draft = readDraft(); if (draft) { data = draft.data; renderAll(); }
+  });
+
+  // Les écrans publics se mettent à jour tout seuls quand la liste publie
+  async function refreshPublished() {
+    if (isAdmin || document.hidden) return;
+    try {
+      const res = await fetch(`data.js?v=${Date.now()}`, { cache: 'no-store' });
+      if (!res.ok) return;
+      const text = await res.text();
+      const { pub, priv } = parseFile(text);
+      if (pub.publishedAt && pub.publishedAt !== published.publishedAt) {
+        published = pub; window.JE_PRIVATE = priv || undefined;
+        data = loadData(); renderPublic();
+      }
+    } catch { /* hors ligne : on réessaiera */ }
+  }
+  setInterval(refreshPublished, 90000);
 
   // Apparition douce des titres de section
   if ('IntersectionObserver' in window) {
@@ -907,5 +1204,7 @@
 
   renderAll();
   setView(view);
-  if (isAdmin) renderAdmin();
+  if (savedCode) {
+    login(savedCode).then(() => setView(view)).catch(() => { try { sessionStorage.removeItem(SESSION_KEY); } catch { /* ignore */ } });
+  }
 })();
