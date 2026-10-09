@@ -1,6 +1,6 @@
 # junior-entreprise-manager
 
-Plateforme de campagne pour une liste de Junior Entreprise, avec une face pour les étudiants et un espace de gestion pour la liste.
+Site de campagne de la liste **Leclercq** (HEC Paris), avec une face pour les étudiants et un espace de gestion pour la liste.
 
 Site statique : aucun serveur ni installation. Ouvrez `index.html` dans un navigateur, ou publiez le dépôt avec GitHub Pages (Settings → Pages → Deploy from a branch → `main` / `(root)`).
 Adresse une fois publiée : https://margauxbouriez-a11y.github.io/junior-entreprise-manager/
@@ -18,7 +18,7 @@ Adresse une fois publiée : https://margauxbouriez-a11y.github.io/junior-entrepr
 - **Inscription e-mail** pour recevoir le programme.
 
 ## Espace liste (bouton « Espace liste », ou `#liste` à la fin de l'adresse)
-Code d'accès par défaut : `horizon2026` (modifiable dans Réglages).
+Code d'accès par défaut : `leclercq2026` (modifiable dans Réglages).
 - **Budget** : recettes et dépenses, solde, plafond, dépenses par poste.
 - **Stocks** : quantités avec boutons +/−, seuils d'alerte, liste de courses générée.
 - **E-mails** : abonnés (copie et export CSV), brouillons de campagne, insertion du programme du jour, ouverture dans la messagerie avec les destinataires en Cci.

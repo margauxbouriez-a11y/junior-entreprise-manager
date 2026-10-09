@@ -3,12 +3,14 @@
 // « Exporter data.js », puis remplacez ce fichier par celui téléchargé.
 window.JE_DATA = {
   "config": {
-    "listName": "Liste Horizon",
+    "listName": "Leclercq",
+    "tagline": "HEC Paris",
     "campaignStart": "2026-10-12",
     "campaignDays": 14,
-    "adminCode": "horizon2026",
+    "adminCode": "leclercq2026",
     "signupWebhook": "",
-    "contactEmail": "liste.horizon@campus.fr"
+    "contactEmail": "",
+    "instagram": ""
   },
   "members": [
     { "id": "m1", "name": "Lina Martin", "role": "Présidente", "phone": "06 12 34 56 01", "location": "Hall principal", "status": "dispo", "updatedAt": "" },
@@ -68,6 +70,6 @@ window.JE_DATA = {
   ],
   "subscribers": [],
   "campaigns": [
-    { "id": "c1", "subject": "Le programme de la semaine 1 est là !", "body": "Salut !\n\nVoici le programme de la semaine : crêpes lundi, baby-foot mardi, conférence mercredi...\n\nRetrouve tout sur le site de la liste.\n\nLa Liste Horizon", "audience": "abonnes", "status": "brouillon", "sentAt": "" }
+    { "id": "c1", "subject": "Le programme de la semaine 1 est là !", "body": "Salut !\n\nVoici le programme de la semaine : crêpes lundi, baby-foot mardi, conférence mercredi...\n\nRetrouve tout sur le site de la liste.\n\nLa liste Leclercq", "audience": "abonnes", "status": "brouillon", "sentAt": "" }
   ]
 };
