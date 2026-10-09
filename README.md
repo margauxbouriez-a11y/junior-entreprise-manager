@@ -11,6 +11,7 @@ Adresse une fois publiée : https://margauxbouriez-a11y.github.io/junior-entrepr
 - `app.js` — le fonctionnement.
 
 ## Face étudiants
+- **Accueil** : ce qui se passe en ce moment (ou le prochain rendez-vous), puis 4 raccourcis : Programme, Food, Demandes, L'équipe.
 - **Programme** : les 2 semaines de campagne jour par jour (événements + stands food).
 - **Food** : chaque stand avec la date, le lieu, le prix et une jauge des portions restantes.
 - **Services** proposés par la liste.
@@ -19,11 +20,11 @@ Adresse une fois publiée : https://margauxbouriez-a11y.github.io/junior-entrepr
 
 ## Espace liste (bouton « Espace liste », ou `#liste` à la fin de l'adresse)
 Code d'accès par défaut : `leclercq2026` (modifiable dans Réglages).
+- **Aperçu** (page d'accueil de l'espace) : les stocks food à surveiller avec boutons +/−, la position et le statut de chaque membre (modifiables directement), et les stands food du jour avec le compteur de portions servies.
+- **Stocks food** : un produit par carte, rangé par catégorie (Food, Boissons, Matériel…), avec boutons +/−, seuil d'alerte, filtre « À racheter » et liste de courses générée.
+- **Où sont les membres** : une carte par membre ; un clic pour changer de statut (Disponible, Occupé·e, En pause, Absent·e), un champ pour la position (avec suggestions des lieux connus), et l'heure de la dernière mise à jour.
 - **Budget** : recettes et dépenses, solde, plafond, dépenses par poste.
-- **Stocks** : quantités avec boutons +/−, seuils d'alerte, liste de courses générée.
-- **E-mails** : abonnés (copie et export CSV), brouillons de campagne, insertion du programme du jour, ouverture dans la messagerie avec les destinataires en Cci.
-- **Stands food** : portions prévues et servies (la jauge publique suit).
-- **Événements et services**, **Membres** (position et statut), **Réglages**.
+- **Stands food**, **E-mails**, **Événements et services**, **Réglages**.
 
 ## Publier les modifications
 Le site n'a pas de base de données. Ce que la liste modifie est enregistré dans le navigateur utilisé.

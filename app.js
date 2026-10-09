@@ -171,24 +171,36 @@
       <div class="progress-label"><span>${esc(progressLabel)}</span><span>${days.length} jours</span></div></div>`;
   }
 
-  function renderHeroStats() {
-    const dispo = data.members.filter((m) => m.status === 'dispo').length;
-    const portions = data.food.reduce((s, f) => s + foodLevel(f).left, 0);
-    const stats = [
-      [data.events.length, 'événements'],
-      [data.food.length, 'stands food'],
-      [num(portions), 'portions à venir'],
-      [`${dispo}/${data.members.length}`, 'membres dispo maintenant'],
-    ];
-    $('#hero-stats').innerHTML = stats.map(([n, l]) => `<div class="stat"><div class="n">${esc(n)}</div><div class="l">${esc(l)}</div></div>`).join('');
-  }
-
-  function renderTicker() {
+  // Quatre raccourcis clairs sous l'en-tête
+  function renderQuick() {
     const now = new Date();
-    const up = allSlots().filter((s) => s.endAt > now).slice(0, 10);
-    const list = up.length ? up : allSlots().slice(0, 10);
-    const html = list.map((s) => `<span>${esc(fmtShort(s.date).replace('.', ''))} · ${esc(s.start.replace(':', 'h'))} <b>${esc(s.label)}</b> ${esc(s.place)}</span>`).join('');
-    $('#ticker').innerHTML = html + html;
+    const arrow = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+    const card = (href, k, big, sub, cls = '') => `<a class="quick-card ${cls}" href="${href}"><span class="k">${k}${arrow}</span><span class="big">${big}</span><span class="sub">${sub}</span></a>`;
+    const short = (iso) => esc(fmtShort(iso).replace('.', ''));
+    const h = (t) => esc(t.replace(':', 'h'));
+
+    const slots = allSlots();
+    const today = slots.filter((x) => x.date === todayIso && x.kind === 'event');
+    const nextEvent = slots.find((x) => x.kind === 'event' && x.endAt > now);
+    const prog = today.length
+      ? card('#programme', 'Programme', `${today.length} rendez-vous aujourd'hui`, nextEvent ? `${h(nextEvent.start)} · ${esc(nextEvent.title)}` : 'Voir la journée')
+      : card('#programme', 'Programme', nextEvent ? esc(nextEvent.title) : 'Le programme',
+        nextEvent ? `${short(nextEvent.date)} · ${h(nextEvent.start)}` : 'Toute la campagne, jour par jour');
+
+    const nextFood = slots.find((x) => x.kind === 'food' && x.endAt > now);
+    const food = nextFood
+      ? card('#food', nextFood.startAt <= now ? 'Food · ouvert' : 'Food', `Stand ${esc(nextFood.name)}`,
+        `${nextFood.date === todayIso ? "Aujourd'hui" : short(nextFood.date)} · ${esc(hours(nextFood.start, nextFood.end))} · ${num(foodLevel(nextFood).left)} portions`)
+      : card('#food', 'Food', 'Les stands', 'Bientôt annoncés');
+
+    const types = requestTypes().map((t) => t.label);
+    const req = types.length
+      ? card('#demandes', 'Demandes', 'Un besoin ?', esc(types.slice(0, 3).join(', ') + (types.length > 3 ? '…' : '')), 'accent') : '';
+
+    const dispo = data.members.filter((m) => m.status === 'dispo').length;
+    const team = card('#equipe', "L'équipe", `${dispo} membre${dispo > 1 ? 's' : ''} dispo`, "Trouver quelqu'un de la liste");
+
+    $('#quick').innerHTML = prog + food + req + team;
   }
 
   function renderDays() {
@@ -413,7 +425,8 @@
   let isAdmin = false;
   try { isAdmin = sessionStorage.getItem(SESSION_KEY) === '1'; } catch { /* ignore */ }
   let view = location.hash === '#liste' ? 'admin' : 'public';
-  let currentTab = 'budget';
+  let currentTab = 'overview';
+  let stockFilter = 'Tout';
 
   function setView(v) {
     view = v;
@@ -449,11 +462,13 @@
     setView('public');
   });
 
+  function goTab(tab) {
+    currentTab = tab;
+    $$('#admin-tabs button').forEach((x) => x.classList.toggle('on', x.dataset.tab === tab));
+    $$('[data-panel]').forEach((p) => { p.hidden = p.dataset.panel !== tab; });
+  }
   $('#admin-tabs').addEventListener('click', (e) => {
-    const b = e.target.closest('[data-tab]'); if (!b) return;
-    currentTab = b.dataset.tab;
-    $$('#admin-tabs button').forEach((x) => x.classList.toggle('on', x === b));
-    $$('[data-panel]').forEach((p) => { p.hidden = p.dataset.panel !== currentTab; });
+    const b = e.target.closest('[data-tab]'); if (b) goTab(b.dataset.tab);
   });
 
   function budgetTotals() {
@@ -475,7 +490,7 @@
     ];
     $('#kpis').innerHTML = kpis.map(([l, n, bad]) => `<div class="card kpi"><div class="label">${l}</div><div class="num ${bad ? 'neg' : ''}">${esc(n)}</div></div>`).join('');
     const stockTab = $('#admin-tabs [data-tab="stock"]');
-    stockTab.innerHTML = `Stocks${low ? `<span class="count">${low}</span>` : ''}`;
+    stockTab.innerHTML = `Stocks food${low ? `<span class="count">${low}</span>` : ''}`;
     $('#sync-banner').className = `banner ${hasLocalChanges ? 'warn' : ''}`;
     $('#sync-banner').innerHTML = hasLocalChanges
       ? '<b>Modifications locales.</b> Elles sont enregistrées dans ce navigateur. Pour que tous les étudiants les voient, cliquez sur « Exporter data.js » puis remplacez le fichier <code>data.js</code> du site.'
@@ -501,18 +516,53 @@
         <td class="num" style="color:var(${b.type === 'recette' ? '--ok' : '--ink'})">${b.type === 'recette' ? '+' : '−'} ${euro(b.amount)}</td><td class="num">${delBtn('budget', b.id)}</td></tr>`).join('');
   }
 
+  // ---------- Stocks food ----------
+  function stockState(st) {
+    const q = Number(st.quantity); const th = Number(st.threshold);
+    if (q <= 0) return { cls: 'out', chip: '<span class="chip bad dot">Rupture</span>', gauge: 'bad' };
+    if (q <= th) return { cls: 'low', chip: '<span class="chip warn dot">À racheter</span>', gauge: 'warn' };
+    return { cls: '', chip: '<span class="chip ok dot">OK</span>', gauge: '' };
+  }
+  const stockCats = () => [...new Set(data.stock.map((st) => st.category || 'Autre'))];
+  function stockCard(st) {
+    const q = Number(st.quantity); const th = Number(st.threshold);
+    const state = stockState(st);
+    const pct = Math.min(100, (q / Math.max(th * 3, q, 1)) * 100);
+    const big = Math.max(1, Math.round(th / 2));
+    return `<div class="stock-card ${state.cls}">
+      <div class="top"><h4>${esc(st.name)}</h4>${state.chip}</div>
+      <div class="qty">${esc(num(q))}<small>${esc(st.unit)}</small></div>
+      <div class="gauge ${state.gauge}"><span style="width:${pct}%"></span></div>
+      <span class="qty-ctl">
+        <button type="button" data-step="-${big}" data-id="${st.id}">−${big}</button>
+        <button type="button" data-step="-1" data-id="${st.id}">−</button>
+        <input type="number" min="0" step="any" value="${esc(st.quantity)}" data-qty="${st.id}" aria-label="Quantité de ${esc(st.name)}">
+        <button type="button" data-step="1" data-id="${st.id}">+</button>
+        <button type="button" data-step="${big}" data-id="${st.id}">+${big}</button>
+      </span>
+      <div class="foot"><span>Alerte sous ${esc(num(th))} ${esc(st.unit)}</span><button class="del" type="button" data-del="stock" data-id="${esc(st.id)}">Supprimer</button></div>
+    </div>`;
+  }
   function renderStock() {
-    const rows = [...data.stock].sort((a, b) => (Number(a.quantity) <= Number(a.threshold) ? 0 : 1) - (Number(b.quantity) <= Number(b.threshold) ? 0 : 1) || a.name.localeCompare(b.name));
-    $('#stock-table').innerHTML = '<tr><th>Produit</th><th>Quantité</th><th>Seuil</th><th>État</th><th></th></tr>' + rows.map((s) => {
-      const q = Number(s.quantity); const th = Number(s.threshold);
-      const tag = q === 0 ? '<span class="chip bad">Rupture</span>' : q <= th ? '<span class="chip warn">À racheter</span>' : '<span class="chip ok">OK</span>';
-      return `<tr><td>${esc(s.name)}</td>
-        <td><span class="qty-ctl"><button type="button" data-step="-1" data-id="${s.id}">−</button><input type="number" min="0" step="any" value="${esc(s.quantity)}" data-qty="${s.id}"><button type="button" data-step="1" data-id="${s.id}">+</button></span> <span class="faint">${esc(s.unit)}</span></td>
-        <td>${esc(s.threshold)} ${esc(s.unit)}</td><td>${tag}</td><td class="num">${delBtn('stock', s.id)}</td></tr>`;
-    }).join('');
+    const cats = stockCats();
+    if (stockFilter !== 'Tout' && stockFilter !== 'À racheter' && !cats.includes(stockFilter)) stockFilter = 'Tout';
     const low = lowStock();
+    $('#stock-filters').innerHTML = ['Tout', ...cats, 'À racheter'].map((c) =>
+      `<button type="button" data-sfilter="${esc(c)}" class="${c === stockFilter ? 'on' : ''}">${esc(c)}${c === 'À racheter' && low.length ? ` (${low.length})` : ''}</button>`).join('');
+    const byName = (a, b) => a.name.localeCompare(b.name, 'fr');
+    let html;
+    if (stockFilter === 'À racheter') {
+      html = low.length ? `<div class="stock-grid">${[...low].sort(byName).map(stockCard).join('')}</div>` : '<div class="empty">Rien à racheter. 👌</div>';
+    } else {
+      const shown = stockFilter === 'Tout' ? cats : [stockFilter];
+      html = shown.map((c) => `<div class="stock-cat">${esc(c)}</div><div class="stock-grid">${
+        data.stock.filter((st) => (st.category || 'Autre') === c).sort(byName).map(stockCard).join('')}</div>`).join('')
+        || '<div class="empty">Aucun produit. Ajoutez-en un ci-dessous.</div>';
+    }
+    $('#stock-list').innerHTML = html;
+    $('#stock-cats').innerHTML = [...new Set(['Food', 'Boissons', 'Matériel', ...cats])].map((c) => `<option>${esc(c)}</option>`).join('');
     $('#shopping').textContent = low.length
-      ? low.map((s) => `${s.name} : ${Math.max(0, Number(s.threshold) * 2 - Number(s.quantity))} ${s.unit}`).join(' · ')
+      ? low.map((st) => `${st.name} : ${Math.max(1, Number(st.threshold) * 2 - Number(st.quantity))} ${st.unit}`).join(' · ')
       : 'Tous les stocks sont au-dessus du seuil.';
   }
 
@@ -557,13 +607,80 @@
       `<tr><td>${esc(s.title)}</td><td>${esc(s.description)}</td><td>${esc(s.where)}</td><td class="num">${delBtn('service', s.id)}</td></tr>`).join('');
   }
 
+  // ---------- Où sont les membres ----------
+  const knownPlaces = () => [...new Set([...data.events, ...data.food].map((x) => x.place)
+    .concat(data.members.map((m) => m.location)).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'fr'));
+  const sinceText = (iso) => {
+    if (!iso) return 'Jamais mis à jour';
+    const min = Math.round((Date.now() - new Date(iso)) / 60000);
+    if (min < 1) return "Mis à jour à l'instant";
+    if (min < 60) return `Mis à jour il y a ${min} min`;
+    if (min < 24 * 60) return `Mis à jour il y a ${Math.floor(min / 60)} h`;
+    return `Mis à jour ${new Date(iso).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })}`;
+  };
+  function statusSummary() {
+    const counts = {};
+    data.members.forEach((m) => { counts[m.status] = (counts[m.status] || 0) + 1; });
+    return Object.entries(STATUS).filter(([k]) => counts[k])
+      .map(([k, v]) => `<span class="chip ${v.cls} dot">${counts[k]} ${esc(v.label.toLowerCase())}</span>`).join('');
+  }
   function renderMembersAdmin() {
-    $('#members-table').innerHTML = '<tr><th>Membre</th><th>Position actuelle</th><th>Statut</th><th>Téléphone</th><th></th></tr>' + data.members.map((m) =>
-      `<tr><td><b>${esc(m.name)}</b><div class="faint">${esc(m.role)}</div></td>
-        <td><input value="${esc(m.location)}" data-member="${m.id}" data-field="location" placeholder="Où es-tu ?"></td>
-        <td><select data-member="${m.id}" data-field="status">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${m.status === k ? 'selected' : ''}>${v.label}</option>`).join('')}</select></td>
-        <td><input value="${esc(m.phone)}" data-member="${m.id}" data-field="phone" type="tel" style="width:140px"></td>
-        <td class="num">${delBtn('member', m.id)}</td></tr>`).join('');
+    $('#places').innerHTML = knownPlaces().map((pl) => `<option value="${esc(pl)}">`).join('');
+    $('#members-summary').innerHTML = statusSummary();
+    $('#members-list').innerHTML = data.members.map((m) => `
+      <div class="admin-member">
+        <div class="member-top">
+          <div class="avatar ${esc(m.status)}" style="background:${avatarColor(m.name)}">${esc(initials(m.name))}</div>
+          <div><h3 style="font:600 1rem/1.25 var(--sans)">${esc(m.name)}</h3><div class="role">${esc(m.role)}</div></div>
+        </div>
+        <div class="status-pills" role="group" aria-label="Statut de ${esc(m.name)}">${Object.entries(STATUS).map(([k, v]) =>
+          `<button type="button" class="${m.status === k ? `on ${v.cls}` : ''}" data-mstatus="${k}" data-id="${m.id}">${esc(v.label.replace('Hors campus', 'Absent·e'))}</button>`).join('')}</div>
+        <label class="loc-field">${ICON.pin}<input list="places" value="${esc(m.location)}" data-member="${m.id}" data-field="location" placeholder="Où es-tu ?" aria-label="Position de ${esc(m.name)}"></label>
+        <div class="foot"><span>${esc(sinceText(m.updatedAt))}</span>
+          <span style="display:flex;gap:8px;align-items:center"><input type="tel" value="${esc(m.phone)}" data-member="${m.id}" data-field="phone" placeholder="Téléphone" aria-label="Téléphone de ${esc(m.name)}">
+          <button class="del" type="button" data-del="member" data-id="${esc(m.id)}" style="border:0;background:none;color:var(--ink-3);cursor:pointer;text-decoration:underline;font:0.76rem var(--sans)">Suppr.</button></span></div>
+      </div>`).join('');
+  }
+
+  // ---------- Aperçu ----------
+  function renderOverview() {
+    // Stocks : d'abord ce qui manque, puis le reste
+    const low = lowStock();
+    const rest = data.stock.filter((st) => !low.includes(st)).sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+    const stockRows = [...low, ...rest].slice(0, 7).map((st) => {
+      const state = stockState(st);
+      return `<div class="ov-row"><div><b>${esc(st.name)}</b> ${state.cls ? state.chip : ''}<span class="sub">${esc(num(Number(st.quantity)))} ${esc(st.unit)} · alerte sous ${esc(num(Number(st.threshold)))}</span></div>
+        <span class="qty-ctl"><button type="button" data-step="-1" data-id="${st.id}">−</button><button type="button" data-step="1" data-id="${st.id}">+</button></span></div>`;
+    }).join('');
+    $('#ov-stock').innerHTML = data.stock.length
+      ? `<div class="ov-list">${stockRows}</div>${data.stock.length > 7 ? `<p class="faint" style="margin:10px 0 0">+ ${data.stock.length - 7} autres produits dans « Stocks food ».</p>` : ''}`
+      : '<p class="ov-empty">Aucun produit en stock.</p>';
+
+    // Équipe : statut et position modifiables directement
+    const order = { dispo: 0, occupe: 1, pause: 2, absent: 3 };
+    $('#ov-team').innerHTML = `<div class="team-bar" style="margin-bottom:6px">${statusSummary()}</div><div class="ov-list">` +
+      [...data.members].sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9)).map((m) => `
+      <div class="ov-person">
+        <div class="avatar ${esc(m.status)}" style="background:${avatarColor(m.name)}">${esc(initials(m.name))}</div>
+        <div><b style="font-weight:600;font-size:0.92rem">${esc(m.name)}</b>
+          <input list="places" value="${esc(m.location)}" data-member="${m.id}" data-field="location" placeholder="Où es-tu ?" aria-label="Position de ${esc(m.name)}"></div>
+        <select data-member="${m.id}" data-field="status" aria-label="Statut de ${esc(m.name)}">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${m.status === k ? 'selected' : ''}>${v.label}</option>`).join('')}</select>
+      </div>`).join('') + '</div>';
+
+    // Food : les stands du jour, sinon le prochain
+    let stands = data.food.filter((f) => f.date === todayIso).sort(byTime);
+    let title = "Food aujourd'hui";
+    if (!stands.length) {
+      const next = data.food.filter((f) => f.date > todayIso).sort(byTime)[0];
+      if (next) { stands = [next]; title = `Prochain stand · ${fmtLong(next.date)}`; }
+    }
+    $('#ov-food-title').textContent = title;
+    $('#ov-food').innerHTML = stands.length ? '<div class="ov-list">' + stands.map((f) => {
+      const lv = foodLevel(f);
+      return `<div class="ov-row"><div><b>${esc(f.name)}</b> <span class="chip ${lv.cls || 'ok'} dot">${num(lv.left)} / ${num(f.planned)} restantes</span>
+          <span class="sub">${esc(hours(f.start, f.end))} · ${esc(f.place)}</span></div>
+        <span class="qty-ctl"><button type="button" data-serve="-10" data-id="${f.id}">−10</button><button type="button" data-serve="1" data-id="${f.id}">+1</button><button type="button" data-serve="10" data-id="${f.id}">+10 servies</button></span></div>`;
+    }).join('') + '</div>' : '<p class="ov-empty">Aucun stand prévu.</p>';
   }
 
   function renderSettings() {
@@ -577,12 +694,12 @@
     if (!isAdmin) return;
     // Ne pas écraser un champ en cours de saisie
     const active = document.activeElement;
-    if (active && /^(INPUT|SELECT|TEXTAREA)$/.test(active.tagName) && active.closest('#admin-app table')) return;
-    renderKpis(); renderBudget(); renderStock(); renderEmails(); renderFoodAdmin(); renderEventsAdmin(); renderMembersAdmin(); renderSettings();
+    if (active && active.matches('#admin-app [data-member], #admin-app [data-qty], #admin-app [data-food]')) return;
+    renderKpis(); renderOverview(); renderBudget(); renderStock(); renderEmails(); renderFoodAdmin(); renderEventsAdmin(); renderMembersAdmin(); renderSettings();
   }
 
   function renderPublic() {
-    renderHeader(); renderLive(); renderHeroStats(); renderTicker(); renderDays(); renderAgenda(); renderFoodGrid(); renderServices(); renderMembersPublic(); renderRequests();
+    renderHeader(); renderLive(); renderDays(); renderAgenda(); renderFoodGrid(); renderServices(); renderMembersPublic(); renderRequests(); renderQuick();
   }
   function renderAll() { renderPublic(); renderAdmin(); }
 
@@ -600,7 +717,7 @@
   $('#stock-form').addEventListener('submit', (e) => {
     e.preventDefault();
     const d = formData(e.target);
-    data.stock.push({ id: uid('k'), ...d, quantity: Number(d.quantity), threshold: Number(d.threshold) });
+    data.stock.push({ id: uid('k'), ...d, category: d.category.trim() || 'Autre', quantity: Number(d.quantity), threshold: Number(d.threshold) });
     e.target.reset(); save();
   });
 
@@ -674,7 +791,12 @@
   // Délégation pour les tableaux
   const findIn = (list, id) => data[list].find((x) => x.id === id);
   $('#admin-app').addEventListener('click', (e) => {
-    const t = e.target;
+    const t = e.target.closest('button') || e.target;
+    if (t.dataset.goto) { goTab(t.dataset.goto); window.scrollTo({ top: $('#admin-tabs').offsetTop - 80, behavior: 'smooth' }); return; }
+    if (t.dataset.sfilter) { stockFilter = t.dataset.sfilter; renderStock(); return; }
+    if (t.dataset.mstatus) {
+      const m = findIn('members', t.dataset.id); m.status = t.dataset.mstatus; m.updatedAt = new Date().toISOString(); save(); return;
+    }
     if (t.dataset.del) {
       const map = { budget: 'budget', stock: 'stock', food: 'food', event: 'events', service: 'services', member: 'members', campaign: 'campaigns' };
       if (!confirm('Supprimer cet élément ?')) return;
@@ -778,7 +900,7 @@
   }
 
   // Le bloc « En ce moment » et le programme du jour suivent l'heure
-  setInterval(() => { if (view === 'public') { renderLive(); renderAgenda(); } }, 60000);
+  setInterval(() => { if (view === 'public') { renderLive(); renderAgenda(); renderQuick(); } }, 60000);
 
   renderAll();
   setView(view);

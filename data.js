@@ -66,14 +66,17 @@ window.JE_DATA = {
   ],
   "budgetCap": 2500,
   "stock": [
-    { "id": "k1", "name": "Farine", "unit": "kg", "quantity": 12, "threshold": 5 },
-    { "id": "k2", "name": "Œufs", "unit": "unités", "quantity": 90, "threshold": 30 },
-    { "id": "k3", "name": "Lait", "unit": "L", "quantity": 8, "threshold": 6 },
-    { "id": "k4", "name": "Pâte à tartiner", "unit": "pots", "quantity": 4, "threshold": 3 },
-    { "id": "k5", "name": "Saucisses", "unit": "unités", "quantity": 0, "threshold": 50 },
-    { "id": "k6", "name": "Pains hot-dog", "unit": "unités", "quantity": 40, "threshold": 50 },
-    { "id": "k7", "name": "Gobelets", "unit": "unités", "quantity": 300, "threshold": 100 },
-    { "id": "k8", "name": "Serviettes", "unit": "paquets", "quantity": 6, "threshold": 4 }
+    { "id": "k1", "name": "Farine", "category": "Food", "unit": "kg", "quantity": 12, "threshold": 5 },
+    { "id": "k2", "name": "Œufs", "category": "Food", "unit": "unités", "quantity": 90, "threshold": 30 },
+    { "id": "k3", "name": "Lait", "category": "Food", "unit": "L", "quantity": 8, "threshold": 6 },
+    { "id": "k4", "name": "Pâte à tartiner", "category": "Food", "unit": "pots", "quantity": 4, "threshold": 3 },
+    { "id": "k5", "name": "Saucisses", "category": "Food", "unit": "unités", "quantity": 0, "threshold": 50 },
+    { "id": "k6", "name": "Pains hot-dog", "category": "Food", "unit": "unités", "quantity": 40, "threshold": 50 },
+    { "id": "k7", "name": "Gobelets", "category": "Matériel", "unit": "unités", "quantity": 300, "threshold": 100 },
+    { "id": "k8", "name": "Serviettes", "category": "Matériel", "unit": "paquets", "quantity": 6, "threshold": 4 },
+    { "id": "k9", "name": "Red Bull", "category": "Boissons", "unit": "canettes", "quantity": 48, "threshold": 24 },
+    { "id": "k10", "name": "Jus de fruits", "category": "Boissons", "unit": "L", "quantity": 10, "threshold": 6 },
+    { "id": "k11", "name": "Pâte à pizza", "category": "Food", "unit": "pâtons", "quantity": 25, "threshold": 30 }
   ],
   "subscribers": [],
   "campaigns": [
