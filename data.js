@@ -9,6 +9,7 @@ window.JE_DATA = {
     "campaignDays": 14,
     "adminCode": "leclercq2026",
     "signupWebhook": "",
+    "requestWebhook": "",
     "contactEmail": "",
     "instagram": ""
   },
@@ -44,6 +45,12 @@ window.JE_DATA = {
     { "id": "f5", "name": "Petit-déj", "date": "2026-10-19", "start": "08:00", "end": "10:00", "place": "Hall principal", "price": "Gratuit", "planned": 180, "served": 0 },
     { "id": "f6", "name": "Burgers", "date": "2026-10-21", "start": "12:00", "end": "14:00", "place": "Cour centrale", "price": "4 €", "planned": 150, "served": 0 },
     { "id": "f7", "name": "Gaufres", "date": "2026-10-22", "start": "16:00", "end": "18:00", "place": "Hall principal", "price": "1 €", "planned": 120, "served": 0 }
+  ],
+  "requestTypes": [
+    { "id": "crepe", "label": "Crêpe", "desc": "Sucrée ou salée, livrée là où vous êtes.", "qty": true },
+    { "id": "redbull", "label": "Red Bull", "desc": "Bien frais, livré en chambre ou en salle.", "qty": true },
+    { "id": "menage", "label": "Ménage de chambre", "desc": "On passe faire le ménage, sur le créneau de votre choix.", "qty": false },
+    { "id": "autre", "label": "Autre chose", "desc": "Un service, une idée, un coup de main : dites-nous tout.", "qty": false }
   ],
   "services": [
     { "id": "s1", "title": "Chargeurs de téléphone", "description": "Prêt de chargeurs au local, contre une carte étudiante.", "where": "Local BDE" },

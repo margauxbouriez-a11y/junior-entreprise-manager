@@ -247,6 +247,34 @@
   .member .where small { display: block; color: var(--ink-3); font-size: 0.74rem; margin-top: 2px; }
   .member-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 
+  /* Demandes */
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .req { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 24px; align-items: start; }
+  .req-types { border: 0; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .req-tile { position: relative; cursor: pointer; }
+  .req-tile input { position: absolute; opacity: 0; pointer-events: none; }
+  .req-tile .tile {
+    display: flex; flex-direction: column; justify-content: space-between; gap: 18px; min-height: 150px; padding: 18px;
+    border: 1px solid var(--line); border-radius: 18px; background: var(--card); transition: border-color .2s, background .2s, color .2s, transform .15s;
+  }
+  .req-tile:hover .tile { border-color: var(--ink-3); transform: translateY(-2px); }
+  .req-tile .tile b { font: 400 1.9rem/1 var(--serif); }
+  .req-tile .tile small { font-size: 0.84rem; color: var(--ink-2); }
+  .req-tile .tile .no { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.16em; color: var(--ink-3); display: flex; justify-content: space-between; }
+  .req-tile .tile .no::after { content: ""; width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--line); }
+  .req-tile input:checked + .tile { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .req-tile input:checked + .tile small, .req-tile input:checked + .tile .no { color: color-mix(in srgb, var(--paper) 70%, transparent); }
+  .req-tile input:checked + .tile .no::after { border-color: var(--accent); background: var(--accent); box-shadow: inset 0 0 0 4px var(--ink); }
+  .req-tile input:focus-visible + .tile { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .req-card { background: var(--card); border: 1px solid var(--line); border-radius: 22px; padding: 26px; }
+  .req-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 14px; }
+  .req .field > span em { font-style: normal; text-transform: none; letter-spacing: 0; font-weight: 400; }
+  .req input, .req textarea { padding: 12px 14px; }
+  .req-foot { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 6px; }
+  .req-foot .note { margin: 0; flex: 1; min-width: 200px; }
+  .note.ok { color: var(--ok); } .note.err { color: var(--bad); }
+  .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+
   /* Newsletter */
   .news { background: var(--night); color: var(--night-ink); border-top: 0; position: relative; overflow: hidden; }
   .news::before { content: ""; position: absolute; left: -10%; bottom: -60%; width: 60vw; height: 60vw; max-width: 760px; max-height: 760px; background: radial-gradient(closest-side, color-mix(in srgb, var(--accent) 35%, transparent), transparent 70%); opacity: .5; pointer-events: none; }
@@ -355,8 +383,14 @@
     .grid-2 { grid-template-columns: 1fr; }
     .nav ul { display: none; }
   }
+  @media (max-width: 960px) {
+    .req { grid-template-columns: 1fr; }
+  }
   @media (max-width: 640px) {
     .wrap { padding: 0 18px; }
+    .req-grid { grid-template-columns: 1fr; }
+    .req-tile .tile { min-height: 120px; }
+    .req-card { padding: 20px 16px; }
     section { padding: 72px 0; }
     .hero { padding-top: 46px; }
     .stats { grid-template-columns: repeat(2, 1fr); }
@@ -386,6 +420,7 @@
       <li><a href="#food">Food</a></li>
       <li><a href="#services">Services</a></li>
       <li><a href="#equipe">L'équipe</a></li>
+      <li><a href="#demandes">Demandes</a></li>
     </ul></nav>
     <button class="btn btn-outline-light btn-sm" id="switch-btn" type="button">Espace liste</button>
   </div>
@@ -403,7 +438,7 @@
           <div class="hero-cta">
             <a class="btn btn-accent" href="#programme">Voir le programme
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
-            <a class="btn btn-outline-light" href="#newsletter">Recevoir le programme</a>
+            <a class="btn btn-outline-light" href="#demandes">Faire une demande</a>
           </div>
         </div>
         <div class="live" id="live" aria-live="polite"></div>
@@ -466,6 +501,38 @@
       </div>
       <div class="team-bar" id="team-bar"></div>
       <div class="team" id="members-public"></div>
+    </div>
+  </section>
+
+  <section id="demandes">
+    <div class="wrap">
+      <div class="s-head reveal">
+        <div class="s-num"><em>05</em> — Demandes</div>
+        <div>
+          <h2>Un besoin ? <i>On s'en charge.</i></h2>
+          <p>Une crêpe, un Red Bull, un ménage de chambre… Choisissez, dites-nous où vous êtes : la demande arrive directement dans la boîte mail de la liste.</p>
+        </div>
+      </div>
+      <form class="req" id="request-form" novalidate>
+        <fieldset class="req-types" id="req-types"><legend class="sr-only">Type de demande</legend></fieldset>
+        <div class="req-card">
+          <div class="req-grid">
+            <label class="field"><span>Prénom et nom</span><input name="name" required autocomplete="name"></label>
+            <label class="field"><span>E-mail</span><input name="email" type="email" required autocomplete="email" placeholder="prenom.nom@hec.edu"></label>
+            <label class="field"><span>Téléphone <em>(facultatif)</em></span><input name="phone" type="tel" autocomplete="tel"></label>
+            <label class="field"><span>Où êtes-vous ?</span><input name="where" required placeholder="Chambre 214, bâtiment…"></label>
+            <label class="field"><span>Quand ?</span><input name="when" placeholder="Dès que possible"></label>
+            <label class="field" id="req-qty"><span>Quantité</span><input name="quantity" type="number" min="1" max="50" value="1"></label>
+          </div>
+          <label class="field"><span>Précisions <em>(facultatif)</em></span><textarea name="details" rows="3" placeholder="Nutella-banane, sans sucre, porte au fond du couloir…"></textarea></label>
+          <label class="hp" aria-hidden="true">Ne pas remplir<input name="website" tabindex="-1" autocomplete="off"></label>
+          <div class="req-foot">
+            <button class="btn btn-accent" type="submit">Envoyer la demande
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+            <p class="note" id="request-status" role="status"></p>
+          </div>
+        </div>
+      </form>
     </div>
   </section>
 
@@ -666,6 +733,8 @@
         <label class="field" style="margin-top:12px"><span>Plafond de budget (€)</span><input name="budgetCap" type="number" min="0" step="1"></label>
         <label class="field"><span>E-mail de contact de la liste</span><input name="contactEmail" type="email"></label>
         <label class="field"><span>Instagram (sans @)</span><input name="instagram"></label>
+        <label class="field"><span>Webhook des demandes (URL de production n8n)</span><input name="requestWebhook" type="url" placeholder="https://….app.n8n.cloud/webhook/leclercq-demandes"></label>
+        <label class="field"><span>Types de demandes — un par ligne : Nom | description | quantité (oui/non)</span><textarea name="requestTypes" rows="5"></textarea></label>
         <label class="field"><span>Webhook d'inscription e-mail (n8n, Zapier, Google Apps Script…)</span><input name="signupWebhook" type="url" placeholder="https://…"></label>
         <label class="field"><span>Code d'accès à l'espace liste</span><input name="adminCode" required></label>
         <div class="toolbar"><button class="btn" type="submit">Enregistrer</button><button class="btn btn-danger" type="button" id="reset-btn">Revenir aux données publiées</button></div>

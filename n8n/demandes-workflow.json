@@ -1,0 +1,142 @@
+{
+  "name": "Leclercq — Demandes du site",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "leclercq-demandes",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "e0c5e63c-3d5f-40b8-9f6d-62bf3bad7e6b",
+      "name": "Demande reçue",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "da463664-b231-4aee-bc01-08c87843174a"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Nettoie et met en forme la demande envoyée par le site\nconst b = $input.first().json.body || {};\n\n// Champ piège : seuls les robots le remplissent\nif (b.website) throw new Error('Demande ignorée (anti-spam)');\n\nconst clean = (v, max = 500) => String(v ?? '').replace(/\\s+/g, ' ').trim().slice(0, max);\nconst d = {\n  type: clean(b.typeLabel || b.type || 'Demande', 60),\n  name: clean(b.name, 120),\n  email: clean(b.email, 160),\n  phone: clean(b.phone, 40),\n  where: clean(b.where, 200),\n  when: clean(b.when, 120) || 'Dès que possible',\n  quantity: clean(b.quantity, 4),\n  details: String(b.details ?? '').trim().slice(0, 2000),\n  list: clean(b.list, 60) || 'Leclercq',\n};\nif (!d.name || !d.where) throw new Error('Demande incomplète : nom ou lieu manquant');\nif (d.email && !/^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(d.email)) d.email = '';\n\nconst quoi = d.type + (d.quantity ? ` × ${d.quantity}` : '');\nconst recu = new Date().toLocaleString('fr-FR', { timeZone: 'Europe/Paris', weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });\n\nconst subject = `[Demande] ${quoi} — ${d.name} (${d.where})`;\nconst text = [\n  `Nouvelle demande reçue sur le site, ${recu}.`,\n  '',\n  `Demande   : ${quoi}`,\n  `Qui       : ${d.name}`,\n  `Où        : ${d.where}`,\n  `Quand     : ${d.when}`,\n  `Téléphone : ${d.phone || '—'}`,\n  `E-mail    : ${d.email || '—'}`,\n  '',\n  d.details ? `Précisions :\\n${d.details}` : 'Pas de précisions.',\n  '',\n  'Répondez directement à ce mail pour écrire à l\\'étudiant.',\n].join('\\n');\n\nconst confirmSubject = `Liste ${d.list} — on a bien reçu votre demande`;\nconst confirmText = [\n  `Bonjour ${d.name.split(' ')[0]},`,\n  '',\n  `Votre demande « ${quoi} » est bien arrivée.`,\n  `Lieu : ${d.where} · Quand : ${d.when}`,\n  '',\n  'Un membre de la liste s\\'en occupe et revient vers vous très vite.',\n  '',\n  `La liste ${d.list}`,\n].join('\\n');\n\nreturn [{ json: { ...d, subject, text, confirmSubject, confirmText } }];\n"
+      },
+      "id": "001ab50f-85c1-49d5-b0da-98d5184fe01f",
+      "name": "Préparer la demande",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "ADRESSE-DE-LA-LISTE@gmail.com",
+        "subject": "={{ $json.subject }}",
+        "emailType": "text",
+        "message": "={{ $json.text }}",
+        "options": {
+          "appendAttribution": false,
+          "replyTo": "={{ $json.email }}"
+        }
+      },
+      "id": "cc2c0439-7003-47a4-9bc7-addea7eddcc8",
+      "name": "Mail à la liste",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"ok\": true }",
+        "options": {}
+      },
+      "id": "3a040114-0840-4ab5-9b0d-569bbcaa5cba",
+      "name": "Répondre au site",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Préparer la demande').item.json.email }}",
+        "subject": "={{ $('Préparer la demande').item.json.confirmSubject }}",
+        "emailType": "text",
+        "message": "={{ $('Préparer la demande').item.json.confirmText }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "83dbbe62-d784-44a5-bb14-bf860f1194ab",
+      "name": "Accusé de réception",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        960,
+        0
+      ],
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Demande reçue": {
+      "main": [
+        [
+          {
+            "node": "Préparer la demande",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer la demande": {
+      "main": [
+        [
+          {
+            "node": "Mail à la liste",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mail à la liste": {
+      "main": [
+        [
+          {
+            "node": "Répondre au site",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Répondre au site": {
+      "main": [
+        [
+          {
+            "node": "Accusé de réception",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

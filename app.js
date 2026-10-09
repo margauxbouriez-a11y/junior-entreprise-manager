@@ -290,6 +290,87 @@
     }).join('');
   }
 
+  // Envoi vers un webhook (n8n…). Le format « formulaire » évite les blocages
+  // CORS du navigateur ; n8n le lit comme un objet dans $json.body.
+  async function postToWebhook(url, payload) {
+    const res = await fetch(url, { method: 'POST', body: new URLSearchParams(payload) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  }
+
+  // ---------- Demandes ----------
+  let reqType = null;
+  const requestTypes = () => (Array.isArray(data.requestTypes) ? data.requestTypes : []);
+
+  function renderRequests() {
+    const types = requestTypes();
+    $('#demandes').hidden = !types.length;
+    if (!types.length) return;
+    if (!types.some((t) => t.id === reqType)) reqType = types[0].id;
+    $('#req-types').innerHTML = '<legend class="sr-only">Type de demande</legend>' + types.map((t, i) => `
+      <label class="req-tile"><input type="radio" name="type" value="${esc(t.id)}" ${t.id === reqType ? 'checked' : ''}>
+        <span class="tile"><span class="no">${String(i + 1).padStart(2, '0')}</span><span><b>${esc(t.label)}</b><br><small>${esc(t.desc || '')}</small></span></span>
+      </label>`).join('');
+    $('#req-qty').hidden = !(types.find((t) => t.id === reqType) || {}).qty;
+  }
+  $('#req-types').addEventListener('change', (e) => {
+    if (e.target.name !== 'type') return;
+    reqType = e.target.value;
+    $('#req-qty').hidden = !(requestTypes().find((t) => t.id === reqType) || {}).qty;
+  });
+
+  $('#request-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const status = $('#request-status');
+    status.className = 'note';
+    if (!form.reportValidity()) return;
+    const type = requestTypes().find((t) => t.id === reqType) || { id: 'autre', label: 'Demande' };
+    const payload = {
+      type: type.id,
+      typeLabel: type.label,
+      name: form.name.value.trim(),
+      email: form.email.value.trim(),
+      phone: form.phone.value.trim(),
+      where: form.where.value.trim(),
+      when: form.when.value.trim() || 'Dès que possible',
+      quantity: type.qty ? String(Math.max(1, Number(form.quantity.value) || 1)) : '',
+      details: form.details.value.trim(),
+      website: form.website.value,
+      list: data.config.listName,
+      sentAt: new Date().toISOString(),
+    };
+    // Champ piège rempli = robot : on fait semblant que tout va bien
+    if (payload.website) { form.reset(); status.textContent = 'Demande envoyée.'; return; }
+
+    const hook = data.config.requestWebhook;
+    const btn = form.querySelector('button[type=submit]');
+    if (!hook) {
+      const mail = data.config.contactEmail;
+      if (!mail) { status.className = 'note err'; status.textContent = "Les demandes ne sont pas encore ouvertes. Revenez très vite !"; return; }
+      const body = [`Demande : ${payload.typeLabel}${payload.quantity ? ` × ${payload.quantity}` : ''}`, `Nom : ${payload.name}`,
+        `E-mail : ${payload.email}`, `Téléphone : ${payload.phone || '—'}`, `Où : ${payload.where}`, `Quand : ${payload.when}`, '', payload.details].join('\n');
+      location.href = `mailto:${encodeURIComponent(mail)}?subject=${encodeURIComponent(`[Demande] ${payload.typeLabel} — ${payload.name}`)}&body=${encodeURIComponent(body)}`;
+      status.textContent = 'Votre messagerie va s\'ouvrir avec la demande prête à envoyer.';
+      return;
+    }
+    btn.disabled = true;
+    status.textContent = 'Envoi en cours…';
+    try {
+      await postToWebhook(hook, payload);
+      form.reset();
+      renderRequests();
+      status.className = 'note ok';
+      status.textContent = `C'est noté ! Votre demande « ${payload.typeLabel} » est bien arrivée. Un membre de la liste revient vers vous très vite${payload.email ? ' (confirmation envoyée par e-mail)' : ''}.`;
+    } catch {
+      status.className = 'note err';
+      status.innerHTML = data.config.contactEmail
+        ? `Oups, la demande n'est pas partie. Réessayez, ou écrivez-nous à <a href="mailto:${esc(data.config.contactEmail)}">${esc(data.config.contactEmail)}</a>.`
+        : "Oups, la demande n'est pas partie. Réessayez dans un instant.";
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
   // Inscription e-mail
   $('#signup-form').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -300,8 +381,7 @@
     const hook = data.config.signupWebhook;
     try {
       if (hook) {
-        const res = await fetch(hook, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...entry, list: data.config.listName }) });
-        if (!res.ok) throw new Error();
+        await postToWebhook(hook, { ...entry, list: data.config.listName });
       }
       if (!data.subscribers.some((s) => s.email === entry.email)) {
         data.subscribers.push(entry);
@@ -488,8 +568,9 @@
 
   function renderSettings() {
     const f = $('#settings-form');
-    ['listName', 'tagline', 'campaignStart', 'campaignDays', 'contactEmail', 'instagram', 'signupWebhook', 'adminCode'].forEach((k) => { f[k].value = data.config[k] ?? ''; });
+    ['listName', 'tagline', 'campaignStart', 'campaignDays', 'contactEmail', 'instagram', 'requestWebhook', 'signupWebhook', 'adminCode'].forEach((k) => { f[k].value = data.config[k] ?? ''; });
     f.budgetCap.value = data.budgetCap ?? '';
+    f.requestTypes.value = requestTypes().map((t) => [t.label, t.desc || '', t.qty ? 'oui' : 'non'].join(' | ')).join('\n');
   }
 
   function renderAdmin() {
@@ -501,7 +582,7 @@
   }
 
   function renderPublic() {
-    renderHeader(); renderLive(); renderHeroStats(); renderTicker(); renderDays(); renderAgenda(); renderFoodGrid(); renderServices(); renderMembersPublic();
+    renderHeader(); renderLive(); renderHeroStats(); renderTicker(); renderDays(); renderAgenda(); renderFoodGrid(); renderServices(); renderMembersPublic(); renderRequests();
   }
   function renderAll() { renderPublic(); renderAdmin(); }
 
@@ -638,6 +719,13 @@
     e.preventDefault();
     const d = formData(e.target);
     data.budgetCap = Number(d.budgetCap) || 0; delete d.budgetCap;
+    // « Crêpe | Sucrée ou salée | oui » → { id, label, desc, qty }
+    data.requestTypes = d.requestTypes.split('\n').map((line) => line.split('|').map((x) => x.trim())).filter(([label]) => label)
+      .map(([label, desc = '', qty = 'non'], i) => {
+        const id = label.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || `type-${i + 1}`;
+        return { id, label, desc, qty: /^(oui|yes|o|y|1|true)$/i.test(qty) };
+      });
+    delete d.requestTypes;
     data.config = { ...data.config, ...d, campaignDays: Number(d.campaignDays) };
     selectedDay = null; save();
     $('#settings-status').textContent = 'Réglages enregistrés.';
