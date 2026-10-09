@@ -318,7 +318,8 @@
     insta.href = `https://instagram.com/${encodeURIComponent((data.config.instagram || '').replace(/^@/, ''))}`;
     const days = campaignDays();
     const range = `du ${parseDay(days[0]).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })} au ${parseDay(days[days.length - 1]).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}`;
-    $('#hero-kicker').textContent = `${tagline ? `${tagline} · ` : ''}Campagne ${range}`;
+    const short = `${parseDay(days[0]).getDate()} — ${parseDay(days[days.length - 1]).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}`;
+    $('#hero-kicker').textContent = `${tagline ? `${tagline} · ` : ''}${short}`;
     $('#footer-dates').textContent = `Campagne ${range}`;
   }
 
@@ -341,13 +342,41 @@
       </a>`).join('');
   }
 
-  // Chiffres clés sous l'en-tête
+  // Compte à rebours de l'affiche : avant la campagne → jusqu'au lancement ;
+  // pendant → jusqu'à la fin ; après → masqué.
+  function campaignBounds() {
+    const days = campaignDays();
+    const start = parseDay(days[0]);
+    const last = parseDay(days[days.length - 1]);
+    return { start, end: new Date(last.getFullYear(), last.getMonth(), last.getDate() + 1) };
+  }
+  function renderCountdown() {
+    const { start, end } = campaignBounds();
+    const now = new Date();
+    let target; let label; let title;
+    if (now < start) { target = start; label = 'Lancement dans'; title = 'La campagne commence'; }
+    else if (now < end) { target = end; label = 'Fin de la campagne dans'; title = 'La campagne est lancée'; }
+    else { title = 'Merci pour cette campagne'; }
+    $('#hero-title').textContent = title;
+    $('#countdown').hidden = !target;
+    if (!target) return;
+    $('#countdown-label').textContent = label;
+    let sec = Math.max(0, Math.floor((target - now) / 1000));
+    const d = Math.floor(sec / 86400); sec -= d * 86400;
+    const h = Math.floor(sec / 3600); sec -= h * 3600;
+    const m = Math.floor(sec / 60); sec -= m * 60;
+    const pad = (n) => String(n).padStart(2, '0');
+    $('#cd-d').textContent = pad(d); $('#cd-h').textContent = pad(h); $('#cd-m').textContent = pad(m); $('#cd-s').textContent = pad(sec);
+  }
+
+  // Chiffres clés (bande dorée)
   function renderHeroFacts() {
+    renderCountdown();
     const facts = [
       [campaignDays().length, 'jours de campagne'],
       [data.events.length, 'événements'],
       [data.food.length, 'stands food'],
-      [products().filter((x) => x.available !== false).length, 'articles offerts à commander'],
+      ['100 %', 'offert par la liste'],
     ];
     $('#hero-facts').innerHTML = facts.map(([n, l]) => `<div><b>${esc(n)}</b><span>${esc(l)}</span></div>`).join('');
   }
@@ -375,7 +404,8 @@
   function renderAgenda() {
     const now = new Date();
     const items = allSlots().filter((s) => s.date === selectedDay);
-    const label = `<div class="agenda-date">${esc(fmtLong(selectedDay))}</div>`;
+    const roman = (n) => [[10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']].reduce((acc, [v, r]) => { while (n >= v) { acc += r; n -= v; } return acc; }, '');
+    const label = `<div class="agenda-date">Épisode ${roman(campaignDays().indexOf(selectedDay) + 1)} · ${esc(fmtLong(selectedDay))}</div>`;
     if (!items.length) { $('#day-agenda').innerHTML = label + '<div class="empty">Journée off. On se retrouve demain.</div>'; return; }
     $('#day-agenda').innerHTML = label + '<div class="agenda">' + items.map((it) => {
       const state = it.startAt <= now && now < it.endAt ? 'now' : it.endAt <= now ? 'past' : '';
@@ -498,7 +528,7 @@
           : `<button class="btn btn-sm" type="button" data-cart="${esc(prod.id)}" data-delta="1">Ajouter</button>`;
       return `<div class="item ${qty ? 'in-cart' : ''} ${off ? 'off' : ''}">
         <div><h4>${esc(prod.name)}</h4>${prod.desc ? `<p>${esc(prod.desc)}</p>` : ''}</div>
-        <span class="limit">Offert · ${maxOf(prod)} max.</span>
+        <span class="limit">Offert<small>${maxOf(prod)} max. par commande</small></span>
         <div class="act">${action}</div>
       </div>`;
     };
@@ -1268,6 +1298,7 @@
 
   // Le bloc « En ce moment » et le programme du jour suivent l'heure
   setInterval(() => { if (view === 'public') { renderAgenda(); renderQuick(); } }, 60000);
+  setInterval(() => { if (view === 'public' && !document.hidden) renderCountdown(); }, 1000);
 
   renderAll();
   setView(view);
