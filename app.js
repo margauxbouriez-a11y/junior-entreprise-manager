@@ -304,11 +304,12 @@
     const tagline = data.config.tagline || '';
     document.title = `${name} — Campagne${tagline ? ` · ${tagline}` : ''}`;
     $('#brand-name').textContent = name;
-    $('#brand-sub').textContent = tagline ? `Liste · ${tagline}` : 'Liste';
-    $('#hero-name').textContent = `${name} — `;
+    $('#brand-sub').textContent = tagline;
+    $('#hero-name').textContent = name;
     $('#login-mark').textContent = name;
-    $('#foot-mark').textContent = name.split(' ')[0];
-    $('#footer-name').textContent = `Liste ${name}${tagline ? ` · ${tagline}` : ''} · Campagne ${new Date().getFullYear()}`;
+    $('#footer-name').textContent = name;
+    $('#footer-tagline').textContent = tagline ? `Liste · ${tagline}` : 'Liste';
+    $('#footer-copy').textContent = `© ${new Date().getFullYear()} ${name}`;
     const mail = $('#footer-mail');
     mail.hidden = !data.config.contactEmail;
     mail.href = `mailto:${data.config.contactEmail || ''}`;
@@ -316,51 +317,39 @@
     insta.hidden = !data.config.instagram;
     insta.href = `https://instagram.com/${encodeURIComponent((data.config.instagram || '').replace(/^@/, ''))}`;
     const days = campaignDays();
-    $('#hero-kicker').textContent = `${tagline ? `${tagline} · ` : ''}Campagne du ${fmtShort(days[0])} au ${fmtShort(days[days.length - 1])}`;
+    const range = `du ${parseDay(days[0]).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })} au ${parseDay(days[days.length - 1]).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}`;
+    $('#hero-kicker').textContent = `${tagline ? `${tagline} · ` : ''}Campagne ${range}`;
+    $('#footer-dates').textContent = `Campagne ${range}`;
   }
 
 
 
   // « Comment ça marche » : les 4 usages du site, avec une info en direct pour chacun
   function renderQuick() {
-    const now = new Date();
-    const arrow = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
-    const short = (iso) => esc(fmtShort(iso).replace('.', ''));
-    const h = (t) => esc(t.replace(':', 'h'));
-    const slots = allSlots();
-
-    const today = slots.filter((x) => x.date === todayIso && x.kind === 'event');
-    const nextEvent = slots.find((x) => x.kind === 'event' && x.endAt > now);
-    const progLive = today.length
-      ? `${today.length} rendez-vous aujourd'hui${nextEvent && nextEvent.date === todayIso ? ` · ${h(nextEvent.start)} ${esc(nextEvent.title)}` : ''}`
-      : nextEvent ? `Prochain : ${esc(nextEvent.title)}, ${short(nextEvent.date)} à ${h(nextEvent.start)}` : 'Programme bientôt en ligne';
-
-    const nextFood = slots.find((x) => x.kind === 'food' && x.endAt > now);
-    const foodLive = nextFood
-      ? `${nextFood.startAt <= now ? 'Ouvert' : nextFood.date === todayIso ? "Aujourd'hui" : short(nextFood.date)} : ${esc(nextFood.name)} · ${num(foodLevel(nextFood).left)} portions`
-      : 'Stands bientôt annoncés';
-
-    const avail = products().filter((x) => x.available !== false);
-    const reqLive = !shopOpen() ? 'Boutique fermée pour le moment'
-      : avail.length ? esc(avail.slice(0, 3).map((x) => x.name).join(' · ') + (avail.length > 3 ? '…' : '')) : 'Catalogue bientôt en ligne';
-
-    const dispo = data.members.filter((m) => m.status === 'dispo').length;
-    const teamLive = `${dispo} membre${dispo > 1 ? 's' : ''} disponible${dispo > 1 ? 's' : ''} en ce moment`;
-
     const steps = [
-      { href: '#programme', icon: 'programme', title: 'Consultez le programme', text: 'Chaque jour de la campagne, les événements et les stands food, heure par heure.', live: progLive, cta: 'Voir le programme' },
-      { href: '#food', icon: 'food', title: 'Repérez la food', text: 'Les stands, leurs horaires et le nombre de portions restantes, en temps réel.', live: foodLive, cta: 'Voir les stands' },
-      { href: '#commander', icon: 'demandes', title: 'Commandez, c\'est offert', text: 'Boissons, crêpes, ménage : ajoutez à votre commande, la liste vous livre gratuitement.', live: reqLive, cta: 'Ouvrir la boutique', featured: true },
-      { href: '#equipe', icon: 'equipe', title: 'Trouvez un membre', text: 'Qui est où, qui est disponible, et un bouton pour l\'appeler directement.', live: teamLive, cta: "Voir l'équipe" },
+      { href: '#programme', icon: 'programme', title: 'Consulter le programme', text: 'Les événements et les stands de chaque jour de la campagne, heure par heure.', cta: 'Voir le programme' },
+      { href: '#food', icon: 'food', title: 'Trouver un stand food', text: 'Horaires, lieux et portions restantes, mis à jour pendant les stands.', cta: 'Voir les stands' },
+      { href: '#commander', icon: 'demandes', title: 'Commander', text: 'Boissons, crêpes, ménage : tout est offert et livré sur le campus.', cta: 'Passer commande' },
+      { href: '#equipe', icon: 'equipe', title: 'Joindre un membre', text: 'Où est chaque membre de la liste, qui est disponible, et son numéro.', cta: "Voir l'équipe" },
     ];
-    $('#quick').innerHTML = steps.map((st, i) => `
-      <a class="step ${st.featured ? 'featured' : ''}" href="${st.href}">
-        <span class="step-top"><span class="step-ico">${STEP_ICON[st.icon]}</span><span class="step-no">0${i + 1}</span></span>
+    $('#quick').innerHTML = steps.map((st) => `
+      <a class="step" href="${st.href}">
+        <span class="step-ico">${STEP_ICON[st.icon]}</span>
         <h3>${st.title}</h3>
         <p>${st.text}</p>
-        <span class="step-live">${st.live}</span>
-        <span class="step-cta">${st.cta}${arrow}</span>
+        <span class="step-cta">${st.cta} →</span>
       </a>`).join('');
+  }
+
+  // Chiffres clés sous l'en-tête
+  function renderHeroFacts() {
+    const facts = [
+      [campaignDays().length, 'jours de campagne'],
+      [data.events.length, 'événements'],
+      [data.food.length, 'stands food'],
+      [products().filter((x) => x.available !== false).length, 'articles offerts à commander'],
+    ];
+    $('#hero-facts').innerHTML = facts.map(([n, l]) => `<div><b>${esc(n)}</b><span>${esc(l)}</span></div>`).join('');
   }
 
   function renderDays() {
@@ -450,15 +439,13 @@
       const st = STATUS[m.status] || STATUS.dispo;
       const tel = (m.phone || '').replace(/[^\d+]/g, '');
       const updated = m.updatedAt ? new Date(m.updatedAt).toLocaleString('fr-FR', { weekday: 'short', hour: '2-digit', minute: '2-digit' }) : '';
-      return `<article class="member ${m.status === 'absent' ? 'absent' : ''}">
-        <div class="member-top">
-          <div class="avatar ${esc(m.status)}" style="background:${avatarColor(m.name)}">${esc(initials(m.name))}</div>
-          <div><h3>${esc(m.name)}</h3><div class="role">${esc(m.role)}</div></div>
-        </div>
+      return `<div class="person ${m.status === 'absent' ? 'absent' : ''}">
+        <div class="avatar ${esc(m.status)}" style="background:${avatarColor(m.name)}">${esc(initials(m.name))}</div>
+        <div><h3>${esc(m.name)}</h3><div class="role">${esc(m.role)}</div></div>
         <div class="where">${ICON.pin}<div>${esc(m.location || 'Position non renseignée')}${updated ? `<small>Mis à jour ${esc(updated)}</small>` : ''}</div></div>
-        <div class="member-foot"><span class="chip ${st.cls} dot">${st.label}</span>
-          ${tel && m.status !== 'absent' ? `<a class="btn btn-ghost btn-sm" href="tel:${esc(tel)}">${ICON.phone}Appeler</a>` : ''}</div>
-      </article>`;
+        <div class="status"><span class="chip ${st.cls} dot">${st.label}</span></div>
+        <div class="act">${tel && m.status !== 'absent' ? `<a class="btn btn-ghost btn-sm" href="tel:${esc(tel)}">${ICON.phone}Appeler</a>` : ''}</div>
+      </div>`;
     }).join('');
   }
 
@@ -500,24 +487,28 @@
     $('#shop-pay').textContent = data.config.deliveryNote || '';
     $('#shop-cats').innerHTML = (cats.length > 1 ? ['Tout', ...cats] : []).map((c) =>
       `<button type="button" data-shopcat="${esc(c)}" class="${c === shopCat ? 'on' : ''}">${esc(c)}</button>`).join('');
-    const list = products().filter((x) => shopCat === 'Tout' || (x.category || 'Autres') === shopCat);
-    $('#products').innerHTML = list.map((prod) => {
+    const shown = shopCat === 'Tout' ? cats : [shopCat];
+    const itemHtml = (prod) => {
       const qty = cart[prod.id] || 0;
       const off = prod.available === false || !shopOpen();
       const action = off
         ? `<span class="chip">${prod.available === false ? 'Épuisé' : 'Fermé'}</span>`
         : qty
           ? `<span class="stepper"><button type="button" data-cart="${esc(prod.id)}" data-delta="-1" aria-label="Retirer">−</button><b>${qty}</b><button type="button" data-cart="${esc(prod.id)}" data-delta="1" aria-label="Ajouter" ${qty >= maxOf(prod) ? 'disabled' : ''}>+</button></span>`
-          : `<button class="btn btn-accent btn-sm" type="button" data-cart="${esc(prod.id)}" data-delta="1">Ajouter</button>`;
-      return `<article class="product ${qty ? 'in-cart' : ''} ${off ? 'off' : ''}">
-        <span class="product-cat">${esc(prod.category || '')}</span>
-        <h3>${esc(prod.name)}</h3>
-        ${prod.desc ? `<p>${esc(prod.desc)}</p>` : ''}
-        <div class="product-foot"><span class="free">Offert<small>${maxOf(prod)} max. par commande</small></span>${action}</div>
-      </article>`;
-    }).join('') || '<div class="empty" style="grid-column:1/-1">Le catalogue arrive bientôt.</div>';
+          : `<button class="btn btn-sm" type="button" data-cart="${esc(prod.id)}" data-delta="1">Ajouter</button>`;
+      return `<div class="item ${qty ? 'in-cart' : ''} ${off ? 'off' : ''}">
+        <div><h4>${esc(prod.name)}</h4>${prod.desc ? `<p>${esc(prod.desc)}</p>` : ''}</div>
+        <span class="limit">Offert · ${maxOf(prod)} max.</span>
+        <div class="act">${action}</div>
+      </div>`;
+    };
+    $('#products').innerHTML = shown.map((c) => {
+      const items = products().filter((x) => (x.category || 'Autres') === c);
+      return items.length ? `<div class="menu-cat"><h3>${esc(c)}</h3><div class="menu">${items.map(itemHtml).join('')}</div></div>` : '';
+    }).join('') || '<div class="empty">Le catalogue arrive bientôt.</div>';
     const n = cartCount();
     $('#cart-count').textContent = n;
+    if ($('#hero-facts').childElementCount) renderHeroFacts();
     $('#cart-fab').hidden = !n || !shopOpen() || view !== 'public';
   }
 
@@ -675,7 +666,6 @@
     $('#admin-view').hidden = v !== 'admin';
     $('#public-nav').style.visibility = v === 'public' ? 'visible' : 'hidden';
     $('#switch-btn').textContent = v === 'public' ? 'Espace liste' : 'Voir le site';
-    $('#foot-mark').hidden = v !== 'public';
     renderShop();
     $('#login-box').hidden = isAdmin;
     $('#admin-app').hidden = !isAdmin;
@@ -684,6 +674,7 @@
     window.scrollTo(0, 0);
   }
   $('#switch-btn').addEventListener('click', () => setView(view === 'public' ? 'admin' : 'public'));
+  $('#footer-admin').addEventListener('click', () => setView('admin'));
 
   // Le code d'accès déchiffre la partie privée : un mauvais code ne donne rien.
   async function unlock(code) {
@@ -1012,7 +1003,7 @@
   }
 
   function renderPublic() {
-    renderHeader(); renderDays(); renderAgenda(); renderFoodGrid(); renderServices(); renderMembersPublic(); renderShop(); renderQuick();
+    renderHeader(); renderHeroFacts(); renderDays(); renderAgenda(); renderFoodGrid(); renderServices(); renderMembersPublic(); renderShop(); renderQuick();
   }
   function renderAll() { renderPublic(); renderAdmin(); }
 
