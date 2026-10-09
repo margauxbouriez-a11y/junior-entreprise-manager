@@ -1,6 +1,6 @@
 # junior-entreprise-manager
 
-Site de campagne de la liste **Leclercq** (HEC Paris), avec une face pour les étudiants et un espace de gestion pour la liste.
+Site de campagne de la liste **Leclercq des étoiles** (HEC Paris), thème « guerre des étoiles » (bleu et or), avec une face pour les étudiants et un espace de gestion pour la liste.
 
 Site statique : aucun serveur ni installation. Ouvrez `index.html` dans un navigateur, ou publiez le dépôt avec GitHub Pages (Settings → Pages → Deploy from a branch → `main` / `(root)`).
 Adresse une fois publiée : https://margauxbouriez-a11y.github.io/junior-entreprise-manager/
@@ -11,7 +11,8 @@ Adresse une fois publiée : https://margauxbouriez-a11y.github.io/junior-entrepr
 - `app.js` — le fonctionnement.
 
 ## Face étudiants
-- **Accueil** : ce qui se passe en ce moment (ou le prochain rendez-vous), puis 4 raccourcis : Programme, Food, Demandes, L'équipe.
+- **Accueil** : le logo, le message de la campagne et ce qui se passe en ce moment, puis « Comment ça marche » : les 4 usages du site (Programme, Food, Demandes, Équipe) avec une info en direct pour chacun.
+- Le logo est dans `assets/` (`logo.jpg`, `logo-180.png`, `favicon.png`) : remplacez ces fichiers pour le changer.
 - **Programme** : les 2 semaines de campagne jour par jour (événements + stands food).
 - **Food** : chaque stand avec la date, le lieu, le prix et une jauge des portions restantes.
 - **Services** proposés par la liste.

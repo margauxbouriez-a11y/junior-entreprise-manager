@@ -3,7 +3,6 @@
 
   const STORE_KEY = 'leclercq-data';
   const SESSION_KEY = 'leclercq-admin';
-  const THEME_KEY = 'leclercq-theme';
   const published = window.JE_DATA;
 
   // ---------- Données ----------
@@ -77,11 +76,17 @@
     phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/></svg>',
   };
 
+  const STEP_ICON = {
+    programme: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18M8 14h3M8 17h6"/></svg>',
+    food: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11h16a8 8 0 0 1-16 0z"/><path d="M8 7c0-1.5 1-2 1-3M12 7c0-1.5 1-2 1-3M16 7c0-1.5 1-2 1-3"/></svg>',
+    demandes: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 6.6L21 9l-5.2 4.3L17.6 20 12 16.3 6.4 20l1.8-6.7L3 9l6.6-.4z"/></svg>',
+    equipe: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6.5 6.5 0 0 1 3.5 5.5"/></svg>',
+  };
+
   // Couleur d'avatar stable par membre
   const AVATAR_COLORS = ['#E4402B', '#1F3A5F', '#2F6B4F', '#8A5A2B', '#5B3F8C', '#B23A6B', '#24617A', '#6B6B1F'];
   const avatarColor = (s) => AVATAR_COLORS[[...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % AVATAR_COLORS.length];
   const initials = (name) => name.trim().split(/\s+/).map((p) => p[0]).slice(0, 2).join('').toUpperCase();
-  const wordmark = (name) => `${esc(name)}<i>.</i>`;
 
   // Horaires réels d'un créneau (gère les fins après minuit et l'absence d'heure de fin)
   function slot(item) {
@@ -121,11 +126,11 @@
     const name = data.config.listName;
     const tagline = data.config.tagline || '';
     document.title = `${name} — Campagne${tagline ? ` · ${tagline}` : ''}`;
-    $('#brand-name').innerHTML = wordmark(name);
+    $('#brand-name').textContent = name;
     $('#brand-sub').textContent = tagline ? `Liste · ${tagline}` : 'Liste';
-    $('#hero-wordmark').innerHTML = wordmark(name);
-    $('#login-mark').innerHTML = wordmark(name);
-    $('#foot-mark').textContent = `${name}.`;
+    $('#hero-name').textContent = `${name} — `;
+    $('#login-mark').textContent = name;
+    $('#foot-mark').textContent = name.split(' ')[0];
     $('#footer-name').textContent = `Liste ${name}${tagline ? ` · ${tagline}` : ''} · Campagne ${new Date().getFullYear()}`;
     const mail = $('#footer-mail');
     mail.hidden = !data.config.contactEmail;
@@ -171,36 +176,45 @@
       <div class="progress-label"><span>${esc(progressLabel)}</span><span>${days.length} jours</span></div></div>`;
   }
 
-  // Quatre raccourcis clairs sous l'en-tête
+  // « Comment ça marche » : les 4 usages du site, avec une info en direct pour chacun
   function renderQuick() {
     const now = new Date();
     const arrow = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
-    const card = (href, k, big, sub, cls = '') => `<a class="quick-card ${cls}" href="${href}"><span class="k">${k}${arrow}</span><span class="big">${big}</span><span class="sub">${sub}</span></a>`;
     const short = (iso) => esc(fmtShort(iso).replace('.', ''));
     const h = (t) => esc(t.replace(':', 'h'));
-
     const slots = allSlots();
+
     const today = slots.filter((x) => x.date === todayIso && x.kind === 'event');
     const nextEvent = slots.find((x) => x.kind === 'event' && x.endAt > now);
-    const prog = today.length
-      ? card('#programme', 'Programme', `${today.length} rendez-vous aujourd'hui`, nextEvent ? `${h(nextEvent.start)} · ${esc(nextEvent.title)}` : 'Voir la journée')
-      : card('#programme', 'Programme', nextEvent ? esc(nextEvent.title) : 'Le programme',
-        nextEvent ? `${short(nextEvent.date)} · ${h(nextEvent.start)}` : 'Toute la campagne, jour par jour');
+    const progLive = today.length
+      ? `${today.length} rendez-vous aujourd'hui${nextEvent && nextEvent.date === todayIso ? ` · ${h(nextEvent.start)} ${esc(nextEvent.title)}` : ''}`
+      : nextEvent ? `Prochain : ${esc(nextEvent.title)}, ${short(nextEvent.date)} à ${h(nextEvent.start)}` : 'Programme bientôt en ligne';
 
     const nextFood = slots.find((x) => x.kind === 'food' && x.endAt > now);
-    const food = nextFood
-      ? card('#food', nextFood.startAt <= now ? 'Food · ouvert' : 'Food', `Stand ${esc(nextFood.name)}`,
-        `${nextFood.date === todayIso ? "Aujourd'hui" : short(nextFood.date)} · ${esc(hours(nextFood.start, nextFood.end))} · ${num(foodLevel(nextFood).left)} portions`)
-      : card('#food', 'Food', 'Les stands', 'Bientôt annoncés');
+    const foodLive = nextFood
+      ? `${nextFood.startAt <= now ? 'Ouvert' : nextFood.date === todayIso ? "Aujourd'hui" : short(nextFood.date)} : ${esc(nextFood.name)} · ${num(foodLevel(nextFood).left)} portions`
+      : 'Stands bientôt annoncés';
 
     const types = requestTypes().map((t) => t.label);
-    const req = types.length
-      ? card('#demandes', 'Demandes', 'Un besoin ?', esc(types.slice(0, 3).join(', ') + (types.length > 3 ? '…' : '')), 'accent') : '';
+    const reqLive = types.length ? esc(types.slice(0, 3).join(' · ') + (types.length > 3 ? '…' : '')) : 'Bientôt ouvert';
 
     const dispo = data.members.filter((m) => m.status === 'dispo').length;
-    const team = card('#equipe', "L'équipe", `${dispo} membre${dispo > 1 ? 's' : ''} dispo`, "Trouver quelqu'un de la liste");
+    const teamLive = `${dispo} membre${dispo > 1 ? 's' : ''} disponible${dispo > 1 ? 's' : ''} en ce moment`;
 
-    $('#quick').innerHTML = prog + food + req + team;
+    const steps = [
+      { href: '#programme', icon: 'programme', title: 'Consultez le programme', text: 'Chaque jour de la campagne, les événements et les stands food, heure par heure.', live: progLive, cta: 'Voir le programme' },
+      { href: '#food', icon: 'food', title: 'Repérez la food', text: 'Les stands, leurs horaires et le nombre de portions restantes, en temps réel.', live: foodLive, cta: 'Voir les stands' },
+      { href: '#demandes', icon: 'demandes', title: 'Faites une demande', text: 'Choisissez, dites où vous êtes : la demande arrive aussitôt chez la liste.', live: reqLive, cta: 'Faire une demande', featured: true },
+      { href: '#equipe', icon: 'equipe', title: 'Trouvez un membre', text: 'Qui est où, qui est disponible, et un bouton pour l\'appeler directement.', live: teamLive, cta: "Voir l'équipe" },
+    ];
+    $('#quick').innerHTML = steps.map((st, i) => `
+      <a class="step ${st.featured ? 'featured' : ''}" href="${st.href}">
+        <span class="step-top"><span class="step-ico">${STEP_ICON[st.icon]}</span><span class="step-no">0${i + 1}</span></span>
+        <h3>${st.title}</h3>
+        <p>${st.text}</p>
+        <span class="step-live">${st.live}</span>
+        <span class="step-cta">${st.cta}${arrow}</span>
+      </a>`).join('');
   }
 
   function renderDays() {
@@ -873,17 +887,6 @@
       alert('Données importées.');
     } catch { alert("Fichier non reconnu : importez un data.js ou un .json exporté depuis l'Espace liste."); }
     e.target.value = '';
-  });
-
-  // Thème clair / sombre
-  const savedTheme = storage.get(THEME_KEY);
-  if (savedTheme) document.documentElement.dataset.theme = savedTheme;
-  $('#theme-btn').addEventListener('click', () => {
-    const dark = document.documentElement.dataset.theme
-      ? document.documentElement.dataset.theme === 'dark'
-      : matchMedia('(prefers-color-scheme: dark)').matches;
-    const next = dark ? 'light' : 'dark';
-    document.documentElement.dataset.theme = next; storage.set(THEME_KEY, next);
   });
 
   // Synchronisation entre onglets ouverts sur le même appareil (ex. tablette du stand)

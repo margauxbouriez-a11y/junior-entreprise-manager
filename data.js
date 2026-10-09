@@ -3,7 +3,7 @@
 // « Exporter data.js », puis remplacez ce fichier par celui téléchargé.
 window.JE_DATA = {
   "config": {
-    "listName": "Leclercq",
+    "listName": "Leclercq des étoiles",
     "tagline": "HEC Paris",
     "campaignStart": "2026-10-12",
     "campaignDays": 14,
@@ -80,6 +80,6 @@ window.JE_DATA = {
   ],
   "subscribers": [],
   "campaigns": [
-    { "id": "c1", "subject": "Le programme de la semaine 1 est là !", "body": "Salut !\n\nVoici le programme de la semaine : crêpes lundi, baby-foot mardi, conférence mercredi...\n\nRetrouve tout sur le site de la liste.\n\nLa liste Leclercq", "audience": "abonnes", "status": "brouillon", "sentAt": "" }
+    { "id": "c1", "subject": "Le programme de la semaine 1 est là !", "body": "Salut !\n\nVoici le programme de la semaine : crêpes lundi, baby-foot mardi, conférence mercredi...\n\nRetrouve tout sur le site de la liste.\n\nLa liste Leclercq des étoiles", "audience": "abonnes", "status": "brouillon", "sentAt": "" }
   ]
 };
