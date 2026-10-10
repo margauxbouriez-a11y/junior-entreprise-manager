@@ -499,6 +499,74 @@
   footer { background: #000F45; }
   .dash-head h1 { font-size: 30px; }
 
+  /* Photos, visionneuse */
+  .thumbs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .thumb { position: relative; width: 84px; height: 84px; border-radius: 6px; overflow: hidden; border: 1px solid var(--line-2); background: var(--surface); padding: 0; cursor: zoom-in; }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .thumb .more { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0, 20, 92, .7); font-weight: 700; }
+  .thumb-x { position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; border-radius: 50%; border: 0; background: rgba(0, 0, 0, .65); color: #fff; font-size: 12px; cursor: pointer; }
+  .row-photos { display: flex; gap: 6px; margin-top: 10px; }
+  .row-photos .thumb { width: 64px; height: 64px; }
+  .prize-chip { display: inline-flex; align-items: center; gap: 8px; margin-top: 10px; padding: 4px 10px 4px 4px; border-radius: 999px; background: var(--gold-soft); color: var(--gold); font-size: 13px; font-weight: 600; border: 1px solid rgba(245, 220, 74, .35); }
+  .prize-chip img { width: 26px; height: 26px; border-radius: 50%; object-fit: cover; }
+  .prize-chip.no-img { padding-left: 10px; }
+  .lightbox { border: 0; padding: 0; background: transparent; max-width: min(92vw, 1100px); max-height: 92vh; color: #fff; }
+  .lightbox::backdrop { background: rgba(0, 8, 40, .88); }
+  .lightbox img { display: block; max-width: 100%; max-height: 82vh; border-radius: 6px; margin: 0 auto; }
+  .lightbox p { text-align: center; margin-top: 10px; color: var(--text-2); }
+  .lightbox-x { position: fixed; top: 16px; right: 16px; width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, .4); background: rgba(0, 20, 92, .6); color: #fff; cursor: pointer; }
+
+  /* Jeu concours */
+  .contest { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+  .prizes { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+  .prize { border-radius: 6px; overflow: hidden; border: 1px solid rgba(255, 255, 255, .16); background: var(--royal); }
+  .prize .ph { aspect-ratio: 4 / 3; background: radial-gradient(70% 70% at 50% 40%, #0B47E0, var(--royal-deep)); display: grid; place-items: center; cursor: zoom-in; border: 0; padding: 0; width: 100%; }
+  .prize .ph img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .prize .ph svg { width: 56px; height: 56px; color: var(--gold); }
+  .prize .cap { padding: 14px 16px; }
+  .prize .cap small { display: block; font-size: 11px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--gold); }
+  .prize .cap b { display: block; font: 700 16px/1.25 var(--display); text-transform: uppercase; margin-top: 4px; }
+  .contest-card { padding: 24px; border-radius: 6px; border: 1px solid rgba(245, 220, 74, .45); background: rgba(0, 20, 92, .45); position: sticky; top: 88px; }
+  .contest-count { display: flex; align-items: baseline; gap: 10px; }
+  .contest-count b { font: 700 48px/1 var(--display); color: var(--gold); font-variant-numeric: tabular-nums; }
+  .contest-count span { font-size: 14px; color: var(--text-2); text-transform: uppercase; letter-spacing: .14em; font-weight: 600; }
+  .contest-end { color: var(--text-2); font-size: 14px; margin: 8px 0 18px; }
+  .contest-submit { width: 100%; margin-top: 14px; }
+  .contest-done { text-align: center; padding: 16px 0; }
+  .contest-done b { display: block; font: 700 18px var(--display); text-transform: uppercase; color: var(--gold); margin-bottom: 6px; }
+  .contest-rules { margin-top: 16px; font-size: 13px; color: var(--text-3); }
+  .contest-rules summary { cursor: pointer; color: var(--text-2); }
+  .contest-rules p { margin-top: 8px; white-space: pre-line; }
+  .live-count { display: flex; align-items: baseline; gap: 10px; margin: 4px 0 16px; }
+  .live-count b { font: 700 44px/1 var(--display); color: var(--gold); }
+  .live-count span { color: var(--text-2); }
+
+  /* Partenaires */
+  .partners { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+  .partner { padding: 22px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, .14); background: linear-gradient(180deg, rgba(255, 255, 255, .08), rgba(255, 255, 255, .02)); display: flex; flex-direction: column; gap: 12px; }
+  .partner-top { display: flex; gap: 14px; align-items: center; }
+  .partner-logo { width: 56px; height: 56px; border-radius: 10px; background: #fff; display: grid; place-items: center; overflow: hidden; flex: 0 0 auto; color: var(--royal); font: 700 18px var(--display); }
+  .partner-logo img { width: 100%; height: 100%; object-fit: contain; }
+  .partner h3 { font: 700 17px/1.2 var(--display); text-transform: uppercase; }
+  .partner .cat { font-size: 12px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--gold); }
+  .partner p { color: var(--text-2); font-size: 14px; }
+  .partner .thumbs { margin-top: 0; }
+  .partner .thumb { width: 72px; height: 72px; }
+  .partner-link { font-weight: 600; font-size: 14px; color: var(--gold); text-decoration: none; margin-top: auto; }
+
+  /* Espace liste : cartes d'édition */
+  .admin-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+  .edit-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; display: grid; gap: 10px; }
+  .edit-card .head { display: flex; gap: 12px; align-items: center; }
+  .edit-card .head .partner-logo, .edit-card .head .prize-mini { width: 48px; height: 48px; }
+  .prize-mini { border-radius: 8px; object-fit: cover; background: var(--surface-2); display: grid; place-items: center; overflow: hidden; flex: 0 0 auto; }
+  .prize-mini img { width: 100%; height: 100%; object-fit: cover; }
+  .edit-card input, .edit-card textarea { font-size: 13px; }
+  .edit-card .foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--text-3); }
+  .file-btn { position: relative; overflow: hidden; }
+  .file-btn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .upload-note { font-size: 12px; color: var(--text-3); }
+
   /* ---------- Responsive ---------- */
   @media (max-width: 960px) {
     .nav ul { display: none; }
@@ -555,7 +623,12 @@
     .step:nth-child(n+3), .step:nth-child(3) { border-top: 1px solid rgba(255, 255, 255, .14); border-left: 1px solid rgba(255, 255, 255, .14); }
     .services { grid-template-columns: 1fr; }
   }
+  @media (max-width: 960px) {
+    .contest { grid-template-columns: 1fr; }
+    .contest-card { position: static; }
+  }
   @media (max-width: 640px) {
+    .partners, .admin-cards { grid-template-columns: 1fr; }
     .poster-in { padding: 28px 16px 56px; }
     .rule { font-size: 11px; letter-spacing: .16em; gap: 10px; }
     .rule::before, .rule::after { width: 22px; }
@@ -580,8 +653,9 @@
       <li><a href="#programme">Programme</a></li>
       <li><a href="#food">Stands food</a></li>
       <li><a href="#commander">Commander</a></li>
+      <li><a href="#concours">Jeu concours</a></li>
+      <li><a href="#partenaires">Partenaires</a></li>
       <li><a href="#equipe">L'équipe</a></li>
-      <li><a href="#services">Services</a></li>
     </ul></nav>
     <button class="btn btn-ghost btn-sm" id="switch-btn" type="button">Espace liste</button>
   </div>
@@ -695,6 +769,49 @@
     </aside>
   </div>
 
+  <section class="alt" id="concours">
+    <div class="wrap">
+      <div class="s-head">
+        <div>
+          <p class="kicker">Jeu concours</p>
+          <h2 id="contest-title">Jeu concours</h2>
+          <p id="contest-desc"></p>
+        </div>
+      </div>
+      <div class="contest">
+        <div class="prizes" id="contest-prizes"></div>
+        <aside class="contest-card">
+          <div class="contest-count"><b id="contest-count">—</b><span id="contest-count-label">inscrits</span></div>
+          <p class="contest-end" id="contest-end"></p>
+          <form id="contest-form" novalidate>
+            <label class="field"><span>Prénom et nom</span><input name="name" required autocomplete="name"></label>
+            <label class="field"><span>E-mail</span><input name="email" type="email" required autocomplete="email" placeholder="prenom.nom@hec.edu"></label>
+            <label class="field"><span>Téléphone <em>(facultatif)</em></span><input name="phone" type="tel" autocomplete="tel"></label>
+            <label class="consent"><input type="checkbox" name="consent" required> J'accepte le règlement du jeu et d'être contacté·e si je gagne.</label>
+            <label class="hp" aria-hidden="true">Ne pas remplir<input name="website" tabindex="-1" autocomplete="off"></label>
+            <button class="btn btn-accent btn-lg contest-submit" type="submit">Je participe</button>
+            <p class="note" id="contest-status" role="status"></p>
+          </form>
+          <div class="contest-done" id="contest-done" hidden></div>
+          <details class="contest-rules" id="contest-rules-wrap" hidden><summary>Règlement</summary><p id="contest-rules"></p></details>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <section id="partenaires">
+    <div class="wrap">
+      <div class="s-head">
+        <div>
+          <p class="kicker">Partenaires</p>
+          <h2>Nos partenaires</h2>
+          <p>Ils soutiennent la campagne et rendent tout ça possible.</p>
+        </div>
+      </div>
+      <div class="partners" id="partners-grid"></div>
+    </div>
+  </section>
+
   <section class="alt" id="equipe">
     <div class="wrap">
       <div class="s-head">
@@ -777,6 +894,8 @@
       <button data-tab="members">Où sont les membres</button>
       <button data-tab="budget">Budget</button>
       <button data-tab="shop">Boutique</button>
+      <button data-tab="contest">Jeu concours</button>
+      <button data-tab="partners">Partenaires</button>
       <button data-tab="food">Stands food</button>
       <button data-tab="emails">E-mails</button>
       <button data-tab="events">Événements</button>
@@ -919,6 +1038,58 @@
       </form>
     </div>
 
+    <!-- Jeu concours -->
+    <div data-panel="contest" hidden>
+      <div class="grid grid-2">
+        <form id="contest-admin-form" class="card panel">
+          <h3>Réglages du jeu</h3>
+          <label class="check-row"><input type="checkbox" name="open"> <span>Inscriptions ouvertes</span></label>
+          <label class="field"><span>Titre</span><input name="title" required placeholder="Gagnez une PS5"></label>
+          <label class="field"><span>Description</span><textarea name="desc" rows="2" placeholder="Inscrivez-vous, tirage au sort le dernier soir de la campagne."></textarea></label>
+          <label class="field"><span>Fin des inscriptions</span><input name="endsAt" type="datetime-local"></label>
+          <label class="field"><span>Règlement <em>(affiché sous le formulaire)</em></span><textarea name="rules" rows="3"></textarea></label>
+          <label class="field"><span>Webhook d'inscription (URL de production n8n)</span><input name="webhook" type="url" placeholder="https://….app.n8n.cloud/webhook/leclercq-concours"></label>
+          <label class="field"><span>Lien du Google Sheet des inscrits <em>(pour l'équipe, jamais affiché sur le site)</em></span><input name="sheetUrl" type="url" placeholder="https://docs.google.com/spreadsheets/…"></label>
+          <div class="toolbar"><button class="btn" type="submit">Enregistrer</button></div>
+          <p class="note" id="contest-admin-status"></p>
+        </form>
+        <div class="card panel">
+          <h3>Inscrits en direct</h3>
+          <div class="live-count"><b id="contest-admin-count">—</b><span>participants</span></div>
+          <div class="toolbar"><button class="btn btn-ghost btn-sm" type="button" id="contest-refresh">Actualiser</button><a class="btn btn-ghost btn-sm" id="contest-sheet-link" href="#" target="_blank" rel="noopener" hidden>Ouvrir la liste des inscrits</a></div>
+          <p class="faint" style="margin-top:12px">Le nombre vient du Google Sheet rempli par n8n (workflow <code>n8n/concours-workflow.json</code>). Une même adresse e-mail ne compte qu'une fois.</p>
+        </div>
+      </div>
+      <h3 class="sub-head">Lots à gagner</h3>
+      <div class="admin-cards" id="prizes-admin"></div>
+      <form id="prize-form" class="form-grid card panel" style="margin-top:12px">
+        <label class="field"><span>Nom du lot</span><input name="name" required placeholder="PS5, places de ciné…"></label>
+        <label class="field"><span>Photo du lot</span><input name="photo" type="file" accept="image/*"></label>
+        <button class="btn" type="submit">Ajouter le lot</button>
+      </form>
+    </div>
+
+    <!-- Partenaires -->
+    <div data-panel="partners" hidden>
+      <p class="muted" style="margin:0 0 16px">Les partenaires s'affichent dans la section « Nos partenaires » du site, avec leur logo et les photos de leurs produits.</p>
+      <div class="admin-cards" id="partners-admin"></div>
+      <h3 class="sub-head">Ajouter un partenaire</h3>
+      <form id="partner-form" class="card panel">
+        <div class="form-grid">
+          <label class="field"><span>Nom</span><input name="name" required></label>
+          <label class="field"><span>Catégorie</span><input name="category" placeholder="Restauration, banque…"></label>
+          <label class="field"><span>Lien (site, Instagram)</span><input name="link" type="url" placeholder="https://…"></label>
+        </div>
+        <label class="field" style="margin-top:12px"><span>Description</span><textarea name="desc" rows="2"></textarea></label>
+        <div class="form-grid">
+          <label class="field"><span>Logo</span><input name="logo" type="file" accept="image/*"></label>
+          <label class="field"><span>Photos des produits</span><input name="photos" type="file" accept="image/*" multiple></label>
+          <button class="btn" type="submit">Ajouter le partenaire</button>
+        </div>
+        <p class="note" id="partner-status"></p>
+      </form>
+    </div>
+
     <!-- Événements -->
     <div data-panel="events" hidden>
       <div class="table-wrap"><table id="events-table"></table></div>
@@ -934,6 +1105,13 @@
           <label class="field"><span>Catégorie</span><input name="category" list="event-cats"></label>
         </div>
         <label class="field" style="margin-top:12px"><span>Description</span><textarea name="description" rows="2"></textarea></label>
+        <div class="form-grid">
+          <label class="field"><span>Photos de l'événement</span><input type="file" accept="image/*" multiple id="event-photos-input"></label>
+          <label class="field"><span>Lot à gagner <em>(facultatif)</em></span><input name="prizeName" placeholder="Ex. : 2 places de concert"></label>
+          <label class="field"><span>Photo du lot</span><input type="file" accept="image/*" id="event-prize-input"></label>
+        </div>
+        <div class="thumbs" id="event-photos-preview"></div>
+        <p class="note" id="event-status"></p>
         <div class="toolbar"><button class="btn" type="submit">Enregistrer</button><button class="btn btn-ghost" type="reset" id="event-cancel">Annuler</button></div>
         <datalist id="event-cats"><option>Soirée</option><option>Sport</option><option>Conférence</option><option>Atelier</option><option>Networking</option><option>Food</option></datalist>
       </form>
@@ -999,6 +1177,12 @@
     </div>
   </div>
 </main>
+
+<dialog class="lightbox" id="lightbox" aria-label="Photo">
+  <button class="lightbox-x" type="button" data-close-lightbox aria-label="Fermer">✕</button>
+  <img id="lightbox-img" alt="">
+  <p id="lightbox-caption"></p>
+</dialog>
 
 <footer id="site-footer">
   <div class="wrap">

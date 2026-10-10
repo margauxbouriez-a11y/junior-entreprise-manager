@@ -119,9 +119,10 @@
   const token = () => storage.get(TOKEN_KEY) || '';
   const sync = { sha: null, base: null, timer: null, busy: false, dirty: false, status: 'idle', at: null, error: '' };
 
-  async function gh(method, body) {
+  const gh = (method, body) => ghFile(ghRepo().path, method, body);
+  async function ghFile(path, method, body) {
     const r = ghRepo();
-    const url = `https://api.github.com/repos/${r.owner}/${r.repo}/contents/${r.path}` + (method === 'GET' ? `?ref=${encodeURIComponent(r.branch)}&t=${Date.now()}` : '');
+    const url = `https://api.github.com/repos/${r.owner}/${r.repo}/contents/${path}` + (method === 'GET' ? `?ref=${encodeURIComponent(r.branch)}&t=${Date.now()}` : '');
     const res = await fetch(url, {
       method, cache: 'no-store',
       headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${token()}`, 'X-GitHub-Api-Version': '2022-11-28' },
@@ -196,6 +197,49 @@
       if (sync.dirty) schedulePublish(500);
     }
   }
+
+  // ---------- Photos ----------
+  // Chaque photo est réduite (1400 px max, JPEG) puis enregistrée dans le dépôt
+  // (assets/uploads/) avec la clé GitHub. Sans clé, elle est intégrée à data.js.
+  const imgCache = {}; // chemin → aperçu, le temps que GitHub Pages publie le fichier
+  const imgSrc = (src) => imgCache[src] || src || '';
+  function resizeImage(file, max = 1400, quality = 0.82) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        const k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+        const c = document.createElement('canvas');
+        c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+        ctx.drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        resolve(c.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Ce fichier n'est pas une image lisible.")); };
+      img.src = url;
+    });
+  }
+  async function storeImage(file, folder) {
+    const dataUrl = await resizeImage(file);
+    if (!token()) return dataUrl;
+    const path = `assets/uploads/${folder}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}.jpg`;
+    await ghFile(path, 'PUT', { message: `Ajoute une photo (${folder})`, content: dataUrl.split(',')[1] });
+    imgCache[path] = dataUrl;
+    return path;
+  }
+  async function storeImages(files, folder, statusEl) {
+    const out = [];
+    const list = [...(files || [])];
+    for (let i = 0; i < list.length; i += 1) {
+      if (statusEl) statusEl.textContent = `Envoi de la photo ${i + 1}/${list.length}…`;
+      out.push(await storeImage(list[i], folder));
+    }
+    if (statusEl) statusEl.textContent = list.length ? (token() ? 'Photos enregistrées. En ligne d\'ici une minute.' : 'Photos enregistrées sur cet appareil (activez la publication automatique pour les mettre en ligne).') : '';
+    return out;
+  }
+  const thumb = (src, caption = '', extra = '') => `<button class="thumb" type="button" data-zoom="${esc(src)}" data-caption="${esc(caption)}"><img src="${esc(imgSrc(src))}" alt="${esc(caption)}" loading="lazy">${extra}</button>`;
 
   // Brouillon local : filet de sécurité si la publication échoue, ou mode sans clé GitHub
   function readDraft() {
@@ -414,7 +458,9 @@
         return `<article class="row ${state}">${time}
           <div><h3>${esc(it.title)}</h3>
             <div class="meta"><span>${ICON.pin}${esc(it.place)}</span></div>
-            ${it.description ? `<p>${esc(it.description)}</p>` : ''}</div>
+            ${it.description ? `<p>${esc(it.description)}</p>` : ''}
+            ${it.prize && it.prize.name ? `<button type="button" class="prize-chip ${it.prize.photo ? '' : 'no-img'}" ${it.prize.photo ? `data-zoom="${esc(it.prize.photo)}" data-caption="À gagner : ${esc(it.prize.name)}"` : ''}>${it.prize.photo ? `<img src="${esc(imgSrc(it.prize.photo))}" alt="">` : ''}À gagner : ${esc(it.prize.name)}</button>` : ''}
+            ${(it.photos || []).length ? `<div class="row-photos">${it.photos.slice(0, 4).map((src, i) => thumb(src, it.title, i === 3 && it.photos.length > 4 ? `<span class="more">+${it.photos.length - 4}</span>` : '')).join('')}</div>` : ''}</div>
           <div>${state === 'now' ? '<span class="chip accent dot">En cours</span>' : it.category ? `<span class="chip">${esc(it.category)}</span>` : ''}</div>
         </article>`;
       }
@@ -484,6 +530,7 @@
   async function postToWebhook(url, payload) {
     const res = await fetch(url, { method: 'POST', body: new URLSearchParams(payload) });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    try { return await res.json(); } catch { return {}; }
   }
 
   // ---------- Boutique (tout est offert) ----------
@@ -646,6 +693,111 @@
     } finally {
       btn.disabled = false;
     }
+  });
+
+  // ---------- Jeu concours ----------
+  const contest = () => data.contest || {};
+  const contestKey = () => `leclercq-contest-${(contest().title || 'jeu').toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+  const countUrl = () => (contest().webhook ? `${contest().webhook.replace(/\/+$/, '')}-compteur` : '');
+  let contestCount = null;
+  const GIFT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M19 12v9H5v-9M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 0 1 0 5"/></svg>';
+  function contestState() {
+    const c = contest();
+    const end = c.endsAt ? new Date(c.endsAt) : null;
+    if (end && end < new Date()) return 'ended';
+    if (!c.open) return 'closed';
+    if (!c.webhook) return 'soon';
+    return 'open';
+  }
+  function renderContest() {
+    const c = contest();
+    $('#concours').hidden = !c.title;
+    if (!c.title) return;
+    $('#contest-title').textContent = c.title;
+    $('#contest-desc').textContent = c.desc || '';
+    const prizes = c.prizes || [];
+    $('#contest-prizes').innerHTML = prizes.length ? prizes.map((pr, i) => `
+      <div class="prize">
+        <button type="button" class="ph" ${pr.photo ? `data-zoom="${esc(pr.photo)}" data-caption="${esc(pr.name)}"` : ''}>${pr.photo ? `<img src="${esc(imgSrc(pr.photo))}" alt="${esc(pr.name)}" loading="lazy">` : GIFT}</button>
+        <div class="cap"><small>Lot ${i + 1}</small><b>${esc(pr.name)}</b></div>
+      </div>`).join('') : `<div class="prize"><div class="ph">${GIFT}</div><div class="cap"><small>Lots</small><b>Bientôt dévoilés</b></div></div>`;
+    const end = c.endsAt ? new Date(c.endsAt) : null;
+    const state = contestState();
+    $('#contest-end').textContent = state === 'ended' ? 'Les inscriptions sont terminées. Merci à tous les participants !'
+      : end ? `Inscriptions jusqu'au ${end.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })} à ${end.toTimeString().slice(0, 5).replace(':', 'h')}.`
+        : '';
+    const done = storage.get(contestKey());
+    $('#contest-form').hidden = state !== 'open' || !!done;
+    $('#contest-done').hidden = !(done || state !== 'open');
+    $('#contest-done').innerHTML = done ? '<b>Vous êtes inscrit·e !</b><p class="muted">Bonne chance. Le ou la gagnante sera contacté·e par e-mail.</p>'
+      : state === 'soon' || state === 'closed' ? '<b>Inscriptions bientôt ouvertes</b><p class="muted">Revenez très vite.</p>'
+        : state === 'ended' ? '<b>Jeu terminé</b>' : '';
+    $('#contest-rules-wrap').hidden = !c.rules;
+    $('#contest-rules').textContent = c.rules || '';
+    $('#contest-count').textContent = contestCount == null ? '—' : num(contestCount);
+    $('#contest-count-label').textContent = contestCount === 1 ? 'inscrit' : 'inscrits';
+  }
+  async function refreshContestCount() {
+    const url = countUrl();
+    if (!url) { contestCount = null; return; }
+    try {
+      const res = await fetch(`${url}?t=${Date.now()}`, { cache: 'no-store' });
+      const json = await res.json();
+      if (typeof json.count === 'number') contestCount = json.count;
+    } catch { /* n8n injoignable : on garde la dernière valeur */ }
+    if ($('#contest-count')) { $('#contest-count').textContent = contestCount == null ? '—' : num(contestCount); }
+    if ($('#contest-admin-count')) $('#contest-admin-count').textContent = contestCount == null ? '—' : num(contestCount);
+  }
+  $('#contest-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const status = $('#contest-status');
+    status.className = 'note';
+    if (!form.reportValidity()) return;
+    const payload = { name: form.name.value.trim(), email: form.email.value.trim(), phone: form.phone.value.trim(), website: form.website.value, list: data.config.listName, contest: contest().title || '' };
+    if (payload.website) { storage.set(contestKey(), '1'); renderContest(); return; }
+    const btn = form.querySelector('button[type=submit]');
+    btn.disabled = true; status.textContent = 'Inscription en cours…';
+    try {
+      const res = await postToWebhook(contest().webhook, payload);
+      if (typeof res.count === 'number') contestCount = res.count;
+      storage.set(contestKey(), payload.email);
+      form.reset(); status.textContent = '';
+      renderContest();
+    } catch {
+      status.className = 'note err';
+      status.textContent = "L'inscription n'est pas passée. Réessayez dans un instant.";
+    } finally { btn.disabled = false; }
+  });
+
+  // ---------- Partenaires ----------
+  function renderPartners() {
+    const list = Array.isArray(data.partners) ? data.partners : [];
+    $('#partenaires').hidden = !list.length;
+    $('#partners-grid').innerHTML = list.map((pa) => `
+      <article class="partner">
+        <div class="partner-top">
+          <div class="partner-logo">${pa.logo ? `<img src="${esc(imgSrc(pa.logo))}" alt="${esc(pa.name)}">` : esc(initials(pa.name))}</div>
+          <div>${pa.category ? `<div class="cat">${esc(pa.category)}</div>` : ''}<h3>${esc(pa.name)}</h3></div>
+        </div>
+        ${pa.desc ? `<p>${esc(pa.desc)}</p>` : ''}
+        ${(pa.photos || []).length ? `<div class="thumbs">${pa.photos.map((src) => thumb(src, pa.name)).join('')}</div>` : ''}
+        ${pa.link ? `<a class="partner-link" href="${esc(pa.link)}" target="_blank" rel="noopener">Découvrir ${esc(pa.name)} →</a>` : ''}
+      </article>`).join('');
+  }
+
+  // ---------- Visionneuse ----------
+  document.addEventListener('click', (e) => {
+    const z = e.target.closest('[data-zoom]');
+    if (z && !e.target.closest('.thumb-x')) {
+      const box = $('#lightbox');
+      $('#lightbox-img').src = imgSrc(z.dataset.zoom);
+      $('#lightbox-img').alt = z.dataset.caption || '';
+      $('#lightbox-caption').textContent = z.dataset.caption || '';
+      if (box.showModal) box.showModal(); else box.setAttribute('open', '');
+      return;
+    }
+    if (e.target.closest('[data-close-lightbox]') || e.target.id === 'lightbox') $('#lightbox').close();
   });
 
   // Inscription e-mail
@@ -913,8 +1065,8 @@
 
   function renderEventsAdmin() {
     const rows = [...data.events].sort(byTime);
-    $('#events-table').innerHTML = '<tr><th>Événement</th><th>Quand</th><th>Lieu</th><th>Catégorie</th><th></th></tr>' + rows.map((e) =>
-      `<tr><td>${esc(e.title)}</td><td>${esc(fmtShort(e.date))} ${esc(hours(e.start, e.end))}</td><td>${esc(e.place)}</td><td>${esc(e.category)}</td>
+    $('#events-table').innerHTML = '<tr><th>Événement</th><th>Quand</th><th>Lieu</th><th>Catégorie</th><th>Photos / lot</th><th></th></tr>' + rows.map((e) =>
+      `<tr><td>${esc(e.title)}</td><td>${esc(fmtShort(e.date))} ${esc(hours(e.start, e.end))}</td><td>${esc(e.place)}</td><td>${esc(e.category)}</td><td>${(e.photos || []).length} photo${(e.photos || []).length > 1 ? 's' : ''}${e.prize && e.prize.name ? ` · lot : ${esc(e.prize.name)}` : ''}</td>
         <td class="num"><button class="btn btn-ghost btn-sm" type="button" data-edit-event="${e.id}">Modifier</button> ${delBtn('event', e.id)}</td></tr>`).join('');
     $('#services-table').innerHTML = '<tr><th>Service</th><th>Description</th><th>Où / qui</th><th></th></tr>' + data.services.map((s) =>
       `<tr><td>${esc(s.title)}</td><td>${esc(s.description)}</td><td>${esc(s.where)}</td><td class="num">${delBtn('service', s.id)}</td></tr>`).join('');
@@ -1013,6 +1165,54 @@
         <td class="num">${delBtn('product', x.id)}</td></tr>`).join('');
   }
 
+  // Jeu concours (Espace liste)
+  function renderContestAdmin() {
+    const c = contest();
+    const f = $('#contest-admin-form');
+    if (!f.contains(document.activeElement)) {
+      f.open.checked = !!c.open;
+      ['title', 'desc', 'endsAt', 'rules', 'webhook', 'sheetUrl'].forEach((k) => { f[k].value = c[k] || ''; });
+    }
+    const link = $('#contest-sheet-link');
+    link.hidden = !c.sheetUrl; link.href = c.sheetUrl || '#';
+    $('#contest-admin-count').textContent = contestCount == null ? '—' : num(contestCount);
+    $('#prizes-admin').innerHTML = (c.prizes || []).map((pr) => `
+      <div class="edit-card">
+        <div class="head"><div class="prize-mini">${pr.photo ? `<img src="${esc(imgSrc(pr.photo))}" alt="">` : GIFT}</div>
+          <input value="${esc(pr.name)}" data-prize="${pr.id}" data-field="name" aria-label="Nom du lot"></div>
+        <div class="foot"><label class="btn btn-ghost btn-sm file-btn">${pr.photo ? 'Changer la photo' : 'Ajouter une photo'}<input type="file" accept="image/*" data-upload="prize" data-id="${pr.id}"></label>
+          <button class="btn btn-danger btn-sm" type="button" data-del="prize" data-id="${pr.id}">Supprimer</button></div>
+      </div>`).join('') || '<p class="faint">Aucun lot pour le moment.</p>';
+  }
+
+  // Partenaires (Espace liste)
+  function renderPartnersAdmin() {
+    const list = Array.isArray(data.partners) ? data.partners : [];
+    $('#partners-admin').innerHTML = list.map((pa) => `
+      <div class="edit-card">
+        <div class="head"><div class="partner-logo">${pa.logo ? `<img src="${esc(imgSrc(pa.logo))}" alt="">` : esc(initials(pa.name))}</div>
+          <input value="${esc(pa.name)}" data-partner="${pa.id}" data-field="name" aria-label="Nom"></div>
+        <input value="${esc(pa.category)}" data-partner="${pa.id}" data-field="category" placeholder="Catégorie" aria-label="Catégorie">
+        <textarea rows="2" data-partner="${pa.id}" data-field="desc" placeholder="Description" aria-label="Description">${esc(pa.desc)}</textarea>
+        <input value="${esc(pa.link)}" data-partner="${pa.id}" data-field="link" placeholder="Lien https://…" aria-label="Lien">
+        ${(pa.photos || []).length ? `<div class="thumbs">${pa.photos.map((src, i) => thumb(src, pa.name, `<span class="thumb-x" role="button" data-del-photo="partner" data-id="${pa.id}" data-index="${i}" aria-label="Retirer">✕</span>`)).join('')}</div>` : ''}
+        <div class="foot">
+          <span class="toolbar"><label class="btn btn-ghost btn-sm file-btn">Logo<input type="file" accept="image/*" data-upload="partner-logo" data-id="${pa.id}"></label>
+          <label class="btn btn-ghost btn-sm file-btn">+ Photos<input type="file" accept="image/*" multiple data-upload="partner-photos" data-id="${pa.id}"></label></span>
+          <button class="btn btn-danger btn-sm" type="button" data-del="partner" data-id="${pa.id}">Supprimer</button>
+        </div>
+        <span class="upload-note" id="up-${pa.id}"></span>
+      </div>`).join('') || '<p class="faint">Aucun partenaire pour le moment.</p>';
+  }
+
+  // Formulaire d'événement : photos et lot en cours d'édition
+  let eventDraft = { photos: [], prizePhoto: '' };
+  function renderEventDraft() {
+    const items = eventDraft.photos.map((src, i) => thumb(src, 'Photo', `<span class="thumb-x" role="button" data-del-draft="${i}" aria-label="Retirer">✕</span>`));
+    if (eventDraft.prizePhoto) items.push(thumb(eventDraft.prizePhoto, 'Photo du lot', '<span class="thumb-x" role="button" data-del-draft="prize" aria-label="Retirer">✕</span>'));
+    $('#event-photos-preview').innerHTML = items.join('');
+  }
+
   function renderSettings() {
     const f = $('#settings-form');
     ['listName', 'tagline', 'campaignStart', 'campaignDays', 'contactEmail', 'instagram', 'signupWebhook'].forEach((k) => { f[k].value = data.config[k] ?? ''; });
@@ -1028,12 +1228,12 @@
     if (!isAdmin) return;
     // Ne pas écraser un champ en cours de saisie
     const active = document.activeElement;
-    if (active && active.matches('#admin-app [data-member], #admin-app [data-qty], #admin-app [data-food], #admin-app [data-product]')) return;
-    renderKpis(); renderOverview(); renderBudget(); renderStock(); renderEmails(); renderFoodAdmin(); renderShopAdmin(); renderEventsAdmin(); renderMembersAdmin(); renderSettings();
+    if (active && active.matches('#admin-app [data-member], #admin-app [data-qty], #admin-app [data-food], #admin-app [data-product], #admin-app [data-partner], #admin-app [data-prize]')) return;
+    renderKpis(); renderOverview(); renderBudget(); renderStock(); renderEmails(); renderFoodAdmin(); renderShopAdmin(); renderContestAdmin(); renderPartnersAdmin(); renderEventsAdmin(); renderMembersAdmin(); renderSettings();
   }
 
   function renderPublic() {
-    renderHeader(); renderHeroFacts(); renderDays(); renderAgenda(); renderFoodGrid(); renderServices(); renderMembersPublic(); renderShop(); renderQuick();
+    renderHeader(); renderHeroFacts(); renderDays(); renderAgenda(); renderFoodGrid(); renderServices(); renderMembersPublic(); renderShop(); renderContest(); renderPartners(); renderQuick();
   }
   function renderAll() { renderPublic(); renderAdmin(); }
 
@@ -1065,11 +1265,69 @@
   $('#event-form').addEventListener('submit', (e) => {
     e.preventDefault();
     const d = formData(e.target);
+    const prizeName = (d.prizeName || '').trim(); delete d.prizeName;
+    d.photos = [...eventDraft.photos];
+    d.prize = prizeName || eventDraft.prizePhoto ? { name: prizeName || 'Lot surprise', photo: eventDraft.prizePhoto } : null;
     if (d.id) Object.assign(data.events.find((x) => x.id === d.id) || {}, d);
     else data.events.push({ ...d, id: uid('e') });
-    e.target.reset(); $('#event-form-title').textContent = 'Ajouter un événement'; save();
+    e.target.reset(); eventDraft = { photos: [], prizePhoto: '' }; renderEventDraft(); $('#event-status').textContent = '';
+    $('#event-form-title').textContent = 'Ajouter un événement'; save();
   });
-  $('#event-cancel').addEventListener('click', () => { $('#event-form-title').textContent = 'Ajouter un événement'; $('#event-form').id.value = ''; });
+  $('#event-cancel').addEventListener('click', () => {
+    $('#event-form-title').textContent = 'Ajouter un événement'; $('#event-form').id.value = '';
+    eventDraft = { photos: [], prizePhoto: '' }; renderEventDraft();
+  });
+  $('#event-photos-input').addEventListener('change', async (e) => {
+    try { eventDraft.photos.push(...await storeImages(e.target.files, 'evenement', $('#event-status'))); } catch (err) { $('#event-status').textContent = err.message; }
+    e.target.value = ''; renderEventDraft();
+  });
+  $('#event-prize-input').addEventListener('change', async (e) => {
+    try { [eventDraft.prizePhoto] = await storeImages(e.target.files, 'lot', $('#event-status')); } catch (err) { $('#event-status').textContent = err.message; }
+    e.target.value = ''; renderEventDraft();
+  });
+  $('#event-photos-preview').addEventListener('click', (e) => {
+    const x = e.target.closest('[data-del-draft]'); if (!x) return;
+    e.stopPropagation();
+    if (x.dataset.delDraft === 'prize') eventDraft.prizePhoto = ''; else eventDraft.photos.splice(Number(x.dataset.delDraft), 1);
+    renderEventDraft();
+  });
+
+  // Jeu concours : réglages, lots
+  $('#contest-admin-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const f = e.target;
+    data.contest = { ...contest(), open: f.open.checked, title: f.title.value.trim(), desc: f.desc.value.trim(), endsAt: f.endsAt.value,
+      rules: f.rules.value.trim(), webhook: f.webhook.value.trim(), sheetUrl: f.sheetUrl.value.trim() };
+    save(); refreshContestCount();
+    $('#contest-admin-status').textContent = token() ? 'Enregistré et publié.' : 'Enregistré sur cet appareil.';
+  });
+  $('#contest-refresh').addEventListener('click', refreshContestCount);
+  $('#prize-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const f = e.target;
+    const btn = f.querySelector('button[type=submit]'); btn.disabled = true;
+    try {
+      const [photo] = f.photo.files.length ? await storeImages(f.photo.files, 'lot', $('#contest-admin-status')) : [''];
+      data.contest = { ...contest(), prizes: [...(contest().prizes || []), { id: uid('l'), name: f.name.value.trim(), photo: photo || '' }] };
+      f.reset(); save();
+    } catch (err) { $('#contest-admin-status').textContent = err.message; }
+    btn.disabled = false;
+  });
+
+  // Partenaires : ajout
+  $('#partner-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const f = e.target;
+    const btn = f.querySelector('button[type=submit]'); btn.disabled = true;
+    try {
+      const [logo] = f.logo.files.length ? await storeImages(f.logo.files, 'partenaire', $('#partner-status')) : [''];
+      const photos = await storeImages(f.photos.files, 'partenaire', $('#partner-status'));
+      if (!Array.isArray(data.partners)) data.partners = [];
+      data.partners.push({ id: uid('pa'), name: f.name.value.trim(), category: f.category.value.trim(), link: f.link.value.trim(), desc: f.desc.value.trim(), logo: logo || '', photos });
+      f.reset(); save();
+    } catch (err) { $('#partner-status').textContent = err.message; }
+    btn.disabled = false;
+  });
 
   $('#service-form').addEventListener('submit', (e) => {
     e.preventDefault();
@@ -1127,6 +1385,19 @@
   $('#admin-app').addEventListener('click', (e) => {
     const t = e.target.closest('button') || e.target;
     if (t.dataset.retry) { publishNow(); return; }
+    const delPhoto = e.target.closest('[data-del-photo]');
+    if (delPhoto) {
+      e.stopPropagation();
+      const pa = (data.partners || []).find((x) => x.id === delPhoto.dataset.id);
+      if (pa && confirm('Retirer cette photo ?')) { pa.photos.splice(Number(delPhoto.dataset.index), 1); save(); }
+      return;
+    }
+    if (t.dataset.del === 'partner' || t.dataset.del === 'prize') {
+      if (!confirm('Supprimer cet élément ?')) return;
+      if (t.dataset.del === 'partner') data.partners = (data.partners || []).filter((x) => x.id !== t.dataset.id);
+      else data.contest = { ...contest(), prizes: (contest().prizes || []).filter((x) => x.id !== t.dataset.id) };
+      save(); return;
+    }
     if (t.dataset.goto) { goTab(t.dataset.goto); window.scrollTo({ top: $('#admin-tabs').offsetTop - 80, behavior: 'smooth' }); return; }
     if (t.dataset.sfilter) { stockFilter = t.dataset.sfilter; renderStock(); return; }
     if (t.dataset.mstatus) {
@@ -1148,6 +1419,8 @@
     if (t.dataset.editEvent) {
       const ev = findIn('events', t.dataset.editEvent); const f = $('#event-form');
       ['id', 'title', 'date', 'start', 'end', 'place', 'category', 'description'].forEach((k) => { f[k].value = ev[k] || ''; });
+      f.prizeName.value = (ev.prize && ev.prize.name) || '';
+      eventDraft = { photos: [...(ev.photos || [])], prizePhoto: (ev.prize && ev.prize.photo) || '' }; renderEventDraft();
       $('#event-form-title').textContent = `Modifier « ${ev.title} »`;
       f.scrollIntoView({ behavior: 'smooth', block: 'center' }); return;
     }
@@ -1165,6 +1438,31 @@
   });
   $('#admin-app').addEventListener('change', (e) => {
     const t = e.target;
+    if (t.dataset.upload) {
+      (async () => {
+        const id = t.dataset.id;
+        const note = $(`#up-${id}`) || $('#contest-admin-status');
+        try {
+          const files = await storeImages(t.files, t.dataset.upload.startsWith('partner') ? 'partenaire' : 'lot', note);
+          if (t.dataset.upload === 'prize') {
+            data.contest = { ...contest(), prizes: (contest().prizes || []).map((x) => (x.id === id ? { ...x, photo: files[0] } : x)) };
+          } else {
+            const pa = (data.partners || []).find((x) => x.id === id);
+            if (t.dataset.upload === 'partner-logo') pa.logo = files[0]; else pa.photos = [...(pa.photos || []), ...files];
+          }
+          save();
+        } catch (err) { if (note) note.textContent = err.message; }
+      })();
+      return;
+    }
+    if (t.dataset.partner) {
+      const pa = (data.partners || []).find((x) => x.id === t.dataset.partner);
+      pa[t.dataset.field] = t.value; t.blur(); save(); return;
+    }
+    if (t.dataset.prize) {
+      data.contest = { ...contest(), prizes: (contest().prizes || []).map((x) => (x.id === t.dataset.prize ? { ...x, name: t.value } : x)) };
+      t.blur(); save(); return;
+    }
     if (t.dataset.product) {
       const x = findIn('products', t.dataset.product);
       x[t.dataset.field] = t.type === 'checkbox' ? t.checked : t.type === 'number' ? Math.max(1, Number(t.value) || 1) : t.value;
@@ -1299,6 +1597,8 @@
   // Le bloc « En ce moment » et le programme du jour suivent l'heure
   setInterval(() => { if (view === 'public') { renderAgenda(); renderQuick(); } }, 60000);
   setInterval(() => { if (view === 'public' && !document.hidden) renderCountdown(); }, 1000);
+  refreshContestCount();
+  setInterval(() => { if (!document.hidden) refreshContestCount(); }, 60000);
 
   renderAll();
   setView(view);

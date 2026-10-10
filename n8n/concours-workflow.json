@@ -1,0 +1,361 @@
+{
+  "name": "Leclercq — Jeu concours",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "leclercq-concours",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "82fdb925-8fb4-461c-a77f-5269ba8e9701",
+      "name": "Inscription reçue",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "ef62cae1-1f96-41d4-bafe-77f68f839073"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Vérifie et met en forme l'inscription au jeu concours\nconst b = $input.first().json.body || {};\nif (b.website) throw new Error('Inscription ignorée (anti-spam)');\nconst clean = (v, max = 160) => String(v ?? '').replace(/\\s+/g, ' ').trim().slice(0, max);\nconst d = {\n  name: clean(b.name, 120),\n  email: clean(b.email).toLowerCase(),\n  phone: clean(b.phone, 40),\n  list: clean(b.list, 60) || 'Leclercq des étoiles',\n  contest: clean(b.contest, 120) || 'Jeu concours',\n};\nif (!d.name || !/^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(d.email)) throw new Error('Inscription incomplète');\nd.date = new Date().toLocaleString('fr-FR', { timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });\nreturn [{ json: d }];\n"
+      },
+      "id": "b9ab3aa3-6c8c-4d89-9d54-be6b7f0e14ba",
+      "name": "Préparer l'inscription",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "COLLEZ-ICI-L-URL-DU-GOOGLE-SHEET",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Concours",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "={{ $json.date }}",
+            "Nom": "={{ $json.name }}",
+            "E-mail": "={{ $json.email }}",
+            "Téléphone": "={{ $json.phone }}"
+          },
+          "matchingColumns": [
+            "E-mail"
+          ],
+          "schema": [
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Nom",
+              "displayName": "Nom",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "E-mail",
+              "displayName": "E-mail",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Téléphone",
+              "displayName": "Téléphone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e1246b2e-152a-440f-9a0e-041ccb4973fa",
+      "name": "Enregistrer l'inscrit",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "COLLEZ-ICI-L-URL-DU-GOOGLE-SHEET",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Concours",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "cc013deb-6ad2-4d1a-a229-468ec906b96c",
+      "name": "Lire les inscrits",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        660,
+        0
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Nombre d'inscrits (une ligne par adresse e-mail)\nconst n = $input.all().filter((i) => String((i.json || {})['E-mail'] || '').trim()).length;\nreturn [{ json: { ok: true, count: n } }];\n"
+      },
+      "id": "2dc5e2d0-9ca9-4c4b-8904-845d6bda1946",
+      "name": "Compter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"ok\": true, \"count\": {{ $json.count }} }",
+        "options": {}
+      },
+      "id": "065063f7-e5c4-42a4-b998-2853ba71fcd5",
+      "name": "Répondre au site",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1100,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Préparer l\\'inscription').item.json.email }}",
+        "subject": "={{ $('Préparer l\\'inscription').item.json.list }} — inscription au jeu concours confirmée",
+        "emailType": "text",
+        "message": "=Bonjour {{ $('Préparer l\\'inscription').item.json.name.split(' ')[0] }},\n\nVotre inscription au jeu concours « {{ $('Préparer l\\'inscription').item.json.contest }} » est bien enregistrée. Bonne chance !\n\nLa liste {{ $('Préparer l\\'inscription').item.json.list }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "2f9bebc7-27f5-40bf-95d2-73863b7946c5",
+      "name": "Confirmation au participant",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1320,
+        0
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "leclercq-concours-compteur",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "230ef1e9-8525-44ca-ad33-56f993135b8c",
+      "name": "Compteur demandé",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        260
+      ],
+      "webhookId": "8f0b7f02-9fff-4135-b451-cddfcb6f97bb"
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "COLLEZ-ICI-L-URL-DU-GOOGLE-SHEET",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Concours",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "e5f70613-6e7b-4ff8-8ff2-64abfb5544fc",
+      "name": "Lire les inscrits (compteur)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        220,
+        260
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Nombre d'inscrits (une ligne par adresse e-mail)\nconst n = $input.all().filter((i) => String((i.json || {})['E-mail'] || '').trim()).length;\nreturn [{ json: { ok: true, count: n } }];\n"
+      },
+      "id": "27906e86-2cba-454d-b0ec-a987bd91fb84",
+      "name": "Compter (compteur)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"ok\": true, \"count\": {{ $json.count }} }",
+        "options": {}
+      },
+      "id": "14a9256c-eb7b-412e-9b0e-fa1d860274be",
+      "name": "Répondre (compteur)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        260
+      ]
+    }
+  ],
+  "connections": {
+    "Inscription reçue": {
+      "main": [
+        [
+          {
+            "node": "Préparer l'inscription",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer l'inscription": {
+      "main": [
+        [
+          {
+            "node": "Enregistrer l'inscrit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enregistrer l'inscrit": {
+      "main": [
+        [
+          {
+            "node": "Lire les inscrits",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire les inscrits": {
+      "main": [
+        [
+          {
+            "node": "Compter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compter": {
+      "main": [
+        [
+          {
+            "node": "Répondre au site",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Répondre au site": {
+      "main": [
+        [
+          {
+            "node": "Confirmation au participant",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compteur demandé": {
+      "main": [
+        [
+          {
+            "node": "Lire les inscrits (compteur)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire les inscrits (compteur)": {
+      "main": [
+        [
+          {
+            "node": "Compter (compteur)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compter (compteur)": {
+      "main": [
+        [
+          {
+            "node": "Répondre (compteur)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

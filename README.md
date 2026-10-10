@@ -17,6 +17,9 @@ Adresse une fois publiée : https://margauxbouriez-a11y.github.io/junior-entrepr
 - **Food** : chaque stand avec la date, le lieu, le prix et une jauge des portions restantes.
 - **Services** proposés par la liste.
 - **Où sommes-nous ?** : la position et le statut de chaque membre, avec un bouton pour l'appeler.
+- **Jeu concours** : les lots en photo, le nombre d'inscrits en direct et le formulaire d'inscription.
+- **Partenaires** : une fiche par partenaire (logo, description, photos des produits, lien).
+- Dans le **Programme**, chaque événement peut afficher ses photos (clic pour agrandir) et un lot à gagner.
 - **Inscription e-mail** pour recevoir le programme.
 
 ## Espace liste (bouton « Espace liste », ou `#liste` à la fin de l'adresse)
@@ -26,7 +29,12 @@ Code d'accès par défaut : `leclercq2026` (modifiable dans Réglages). Il chiff
 - **Où sont les membres** : une carte par membre ; un clic pour changer de statut (Disponible, Occupé·e, En pause, Absent·e), un champ pour la position (avec suggestions des lieux connus), et l'heure de la dernière mise à jour.
 - **Budget** : recettes et dépenses, solde, plafond, dépenses par poste.
 - **Boutique** : catalogue des articles offerts, limite par commande, disponibilité, ouverture ou fermeture de la boutique.
-- **Stands food**, **E-mails**, **Événements et services**, **Réglages**.
+- **Jeu concours** : titre, texte, date de fin, règlement, ouverture des inscriptions, lots avec photo, et nombre d'inscrits en direct.
+- **Partenaires** : ajouter, modifier ou supprimer un partenaire, avec son logo et des photos de ses produits.
+- **Événements** : chaque événement peut recevoir des photos et un lot (nom + photo).
+- **Stands food**, **E-mails**, **Services**, **Réglages**.
+
+**Photos :** elles sont réduites automatiquement (1400 px), puis enregistrées dans le dépôt (`assets/uploads/`) grâce à la clé GitHub de la publication automatique. Elles apparaissent en ligne environ une minute plus tard. Sans clé, elles restent enregistrées sur l'appareil seulement.
 
 ## Publier les modifications (publication automatique)
 Depuis l'Espace liste, chaque modification (événements, stands food, membres, stocks, budget…) peut être **mise en ligne automatiquement** pour tout le monde, en une minute environ. Les écrans publics déjà ouverts se mettent à jour tout seuls toutes les 90 secondes.
@@ -58,7 +66,24 @@ Dans la section **Commander**, les étudiants ajoutent des articles à leur comm
 3. **Save**, puis **Publish**. Copiez la **Production URL** du nœud « Commande reçue ».
 4. Sur le site : **Espace liste → Boutique → Webhook des commandes**, collez l'URL, puis **Enregistrer**.
 
+**Google Sheet des commandes (une ligne par commande, avec une colonne Fait / Pas fait) :**
+1. Créez un Google Sheet. Renommez le premier onglet `Commandes`, puis **Fichier → Importer** `n8n/modele-commandes.csv` en choisissant « Remplacer la feuille actuelle ». Vous obtenez les colonnes : Date, N° commande, **Statut**, Nom, E-mail, Téléphone, Lieu de livraison, Créneau, Articles, Nb d'articles, Précisions.
+2. Sélectionnez la colonne **Statut**, puis **Insertion → Menu déroulant** avec les options `Fait` (vert) et `Pas fait` (rouge). Chaque nouvelle commande arrive en « Pas fait » ; la liste passe la ligne en « Fait » une fois livrée.
+3. Dans n8n, ouvrez le nœud **Ajouter au Google Sheet** : choisissez votre compte Google (Credential « Google Sheets OAuth2 »), puis remplacez `COLLEZ-ICI-L-URL-DU-GOOGLE-SHEET` par l'adresse du Sheet. **Save**.
+
 Tant qu'aucun webhook n'est réglé, la commande ouvre la messagerie de l'étudiant vers l'e-mail de contact de la liste. Sans e-mail de contact non plus, le site indique que les commandes ne sont pas encore ouvertes.
+
+## Jeu concours via n8n + Google Sheet
+Les inscriptions sont enregistrées dans un Google Sheet (une ligne par adresse e-mail : s'inscrire deux fois ne compte qu'une fois). Le site affiche le nombre d'inscrits en direct, mis à jour chaque minute.
+1. Dans le même Google Sheet (ou un autre), ajoutez un onglet `Concours` et importez-y `n8n/modele-concours.csv` (colonnes Date, Nom, E-mail, Téléphone).
+2. Dans n8n, importez `n8n/concours-workflow.json`. Dans les trois nœuds Google Sheets, choisissez votre compte Google et collez l'adresse du Sheet. Dans **Confirmation au participant**, choisissez votre compte Gmail.
+3. **Save**, puis **Publish**. Copiez la **Production URL** du nœud « Inscription reçue » (elle finit par `/webhook/leclercq-concours`).
+4. Sur le site : **Espace liste → Jeu concours**, collez l'URL dans **Webhook d'inscription**, et l'adresse du Sheet dans **Lien du Google Sheet des inscrits**, cochez **Inscriptions ouvertes**, puis **Enregistrer**.
+5. Ajoutez les lots (nom + photo) juste en dessous.
+
+⚠️ Le Sheet contient les e-mails des participants : partagez-le seulement avec les membres de la liste (jamais « Tous les utilisateurs disposant du lien »). Son adresse est visible dans `data.js`, mais elle ne donne aucun accès sans ce partage.
+
+Le compteur utilise automatiquement la deuxième adresse du workflow (`…/leclercq-concours-compteur`), rien à régler. Pour le tirage au sort, ouvrez le Sheet et choisissez une ligne au hasard (par exemple `=INDEX(C2:C; ALEA.ENTRE.BORNES(1; NBVAL(C2:C)))`).
 
 ## Inscriptions e-mail
 Pour recevoir les inscriptions des étudiants de tous les appareils, renseignez dans **Réglages** l'URL d'un webhook (n8n, Zapier, Google Apps Script…). La plateforme y envoie `{ email, name, date, list }` en JSON.
