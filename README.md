@@ -15,7 +15,6 @@ Adresse une fois publiée : https://margauxbouriez-a11y.github.io/junior-entrepr
 - Le logo est dans `assets/` (`logo.jpg`, `logo-180.png`, `favicon.png`) : remplacez ces fichiers pour le changer.
 - **Programme** : les 2 semaines de campagne jour par jour (événements + stands food).
 - **Food** : chaque stand avec la date, le lieu, le prix et une jauge des portions restantes.
-- **Services** proposés par la liste.
 - **Où sommes-nous ?** : la position et le statut de chaque membre, avec un bouton pour l'appeler.
 - **Jeu concours** : les lots en photo, le nombre d'inscrits en direct et le formulaire d'inscription.
 - **Partenaires** : une fiche par partenaire (logo, description, photos des produits, lien).
@@ -32,7 +31,7 @@ Code d'accès par défaut : `leclercq2026` (modifiable dans Réglages). Il chiff
 - **Jeu concours** : titre, texte, date de fin, règlement, ouverture des inscriptions, lots avec photo, et nombre d'inscrits en direct.
 - **Partenaires** : ajouter, modifier ou supprimer un partenaire, avec son logo et des photos de ses produits.
 - **Événements** : chaque événement peut recevoir des photos et un lot (nom + photo).
-- **Stands food**, **E-mails**, **Services**, **Réglages**.
+- **Stands food**, **E-mails**, **Réglages**.
 
 **Photos :** elles sont réduites automatiquement (1400 px), puis enregistrées dans le dépôt (`assets/uploads/`) grâce à la clé GitHub de la publication automatique. Elles apparaissent en ligne environ une minute plus tard. Sans clé, elles restent enregistrées sur l'appareil seulement.
 
@@ -58,7 +57,7 @@ Dans la section **Commander**, les étudiants ajoutent des articles à leur comm
 - envoie un mail à la liste avec le détail. Pour écrire à l'étudiant, il suffit de répondre à ce mail ;
 - envoie un récapitulatif à l'étudiant.
 
-**Gérer le catalogue :** Espace liste → onglet **Boutique**. On peut y ajouter, modifier ou supprimer des produits, régler le maximum par commande, et décocher « Dispo » quand un produit est épuisé. On peut aussi ouvrir ou fermer toute la boutique.
+**Gérer les propositions :** Espace liste → onglet **Boutique**. Chaque proposition est une carte modifiable : nom, catégorie, description, maximum par commande, « Disponible » (sinon elle apparaît « Épuisé »), ordre d'affichage (↑ ↓), et **photos** de ce que les gens commandent (la première sert de vignette sur la boutique, les autres se voient en cliquant dessus). On peut aussi ouvrir ou fermer toute la boutique et modifier le texte d'introduction.
 
 **Brancher n8n :**
 1. Dans n8n : **Create workflow → ⋯ → Import from File**, puis choisissez `n8n/commandes-workflow.json`.

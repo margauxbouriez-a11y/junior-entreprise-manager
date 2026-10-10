@@ -497,13 +497,6 @@
     }).join('') : '<div class="empty">Les stands seront bientôt annoncés.</div>';
   }
 
-  function renderServices() {
-    $('#services-grid').innerHTML = data.services.length ? data.services.map((s, i) =>
-      `<div class="service-item"><div class="no">${String(i + 1).padStart(2, '0')}</div><h3>${esc(s.title)}</h3><p>${esc(s.description)}</p>
-        ${s.where ? `<div class="meta"><span>${ICON.pin}${esc(s.where)}</span></div>` : ''}</div>`).join('')
-      : '<div class="empty" style="grid-column:1/-1">Aucun service pour le moment.</div>';
-  }
-
   function renderMembersPublic() {
     const order = { dispo: 0, occupe: 1, pause: 2, absent: 3 };
     const list = [...data.members].sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9));
@@ -562,6 +555,7 @@
     $('#commander').hidden = !products().length;
     $('#shop-closed').hidden = shopOpen();
     $('#shop-pay').textContent = data.config.deliveryNote || '';
+    $('#shop-intro').textContent = data.config.shopIntro || 'Boissons, crêpes et plus encore, offerts par la liste et livrés sur le campus.';
     $('#shop-cats').innerHTML = (cats.length > 1 ? ['Tout', ...cats] : []).map((c) =>
       `<button type="button" data-shopcat="${esc(c)}" class="${c === shopCat ? 'on' : ''}">${esc(c)}</button>`).join('');
     const shown = shopCat === 'Tout' ? cats : [shopCat];
@@ -573,7 +567,9 @@
         : qty
           ? `<span class="stepper"><button type="button" data-cart="${esc(prod.id)}" data-delta="-1" aria-label="Retirer">−</button><b>${qty}</b><button type="button" data-cart="${esc(prod.id)}" data-delta="1" aria-label="Ajouter" ${qty >= maxOf(prod) ? 'disabled' : ''}>+</button></span>`
           : `<button class="btn btn-sm" type="button" data-cart="${esc(prod.id)}" data-delta="1">Ajouter</button>`;
+      const photos = prod.photos || [];
       return `<div class="item ${qty ? 'in-cart' : ''} ${off ? 'off' : ''}">
+        ${photos.length ? `<button type="button" class="ph" data-zoom="${esc(photos[0])}" data-caption="${esc(prod.name)}" data-gallery="${esc(prod.id)}"><img src="${esc(imgSrc(photos[0]))}" alt="${esc(prod.name)}" loading="lazy">${photos.length > 1 ? `<span class="more">${photos.length} photos</span>` : ''}</button>` : ''}
         <div><h4>${esc(prod.name)}</h4>${prod.desc ? `<p>${esc(prod.desc)}</p>` : ''}</div>
         <span class="limit">Offert<small>${maxOf(prod)} max. par commande</small></span>
         <div class="act">${action}</div>
@@ -593,7 +589,7 @@
     const lines = cartLines();
     $('#cart-items').innerHTML = lines.length ? lines.map((l) => `
       <div class="cart-line">
-        <div><b>${esc(l.prod.name)}</b><small>${esc(l.prod.category || '')} · ${maxOf(l.prod)} max.</small></div>
+        <div class="cl-name">${(l.prod.photos || [])[0] ? `<img src="${esc(imgSrc(l.prod.photos[0]))}" alt="">` : ''}<div><b>${esc(l.prod.name)}</b><small>${esc(l.prod.category || '')} · ${maxOf(l.prod)} max.</small></div></div>
         <span class="stepper"><button type="button" data-cart="${esc(l.prod.id)}" data-delta="-1" aria-label="Retirer">−</button><b>${l.qty}</b><button type="button" data-cart="${esc(l.prod.id)}" data-delta="1" aria-label="Ajouter" ${l.qty >= maxOf(l.prod) ? 'disabled' : ''}>+</button></span>
         <span class="line-total">Offert</span>
       </div>`).join('') + `<div class="cart-total"><span>${cartCount()} article${cartCount() > 1 ? 's' : ''}</span><span>Tout est offert</span></div>`
@@ -787,16 +783,24 @@
   }
 
   // ---------- Visionneuse ----------
+  let gallery = { list: [], i: 0, caption: '' };
+  function showGallery() {
+    const { list, i, caption } = gallery;
+    $('#lightbox-img').src = imgSrc(list[i]);
+    $('#lightbox-img').alt = caption;
+    $('#lightbox-caption').textContent = list.length > 1 ? `${caption} · ${i + 1}/${list.length} (touchez la photo pour la suivante)` : caption;
+  }
   document.addEventListener('click', (e) => {
     const z = e.target.closest('[data-zoom]');
     if (z && !e.target.closest('.thumb-x')) {
       const box = $('#lightbox');
-      $('#lightbox-img').src = imgSrc(z.dataset.zoom);
-      $('#lightbox-img').alt = z.dataset.caption || '';
-      $('#lightbox-caption').textContent = z.dataset.caption || '';
+      const prod = z.dataset.gallery && products().find((x) => x.id === z.dataset.gallery);
+      gallery = { list: prod ? prod.photos : [z.dataset.zoom], i: 0, caption: z.dataset.caption || '' };
+      showGallery();
       if (box.showModal) box.showModal(); else box.setAttribute('open', '');
       return;
     }
+    if (e.target.id === 'lightbox-img' && gallery.list.length > 1) { gallery.i = (gallery.i + 1) % gallery.list.length; showGallery(); return; }
     if (e.target.closest('[data-close-lightbox]') || e.target.id === 'lightbox') $('#lightbox').close();
   });
 
@@ -1068,8 +1072,6 @@
     $('#events-table').innerHTML = '<tr><th>Événement</th><th>Quand</th><th>Lieu</th><th>Catégorie</th><th>Photos / lot</th><th></th></tr>' + rows.map((e) =>
       `<tr><td>${esc(e.title)}</td><td>${esc(fmtShort(e.date))} ${esc(hours(e.start, e.end))}</td><td>${esc(e.place)}</td><td>${esc(e.category)}</td><td>${(e.photos || []).length} photo${(e.photos || []).length > 1 ? 's' : ''}${e.prize && e.prize.name ? ` · lot : ${esc(e.prize.name)}` : ''}</td>
         <td class="num"><button class="btn btn-ghost btn-sm" type="button" data-edit-event="${e.id}">Modifier</button> ${delBtn('event', e.id)}</td></tr>`).join('');
-    $('#services-table').innerHTML = '<tr><th>Service</th><th>Description</th><th>Où / qui</th><th></th></tr>' + data.services.map((s) =>
-      `<tr><td>${esc(s.title)}</td><td>${esc(s.description)}</td><td>${esc(s.where)}</td><td class="num">${delBtn('service', s.id)}</td></tr>`).join('');
   }
 
   // ---------- Où sont les membres ----------
@@ -1155,14 +1157,27 @@
       f.orderWebhook.value = data.config.orderWebhook || '';
       f.deliveryNote.value = data.config.deliveryNote || '';
     }
-    $('#product-cats').innerHTML = [...new Set(['Boissons', 'Food', 'Services', ...productCats()])].map((c) => `<option>${esc(c)}</option>`).join('');
-    $('#products-table').innerHTML = '<tr><th>Produit</th><th>Catégorie</th><th>Description</th><th>Max / commande</th><th>Dispo</th><th></th></tr>' + products().map((x) => `
-      <tr><td><input value="${esc(x.name)}" data-product="${x.id}" data-field="name"></td>
-        <td><input value="${esc(x.category)}" data-product="${x.id}" data-field="category" list="product-cats" style="width:120px"></td>
-        <td><input value="${esc(x.desc)}" data-product="${x.id}" data-field="desc"></td>
-        <td><input type="number" min="1" max="50" value="${esc(maxOf(x))}" data-product="${x.id}" data-field="max" style="width:80px"></td>
-        <td><input type="checkbox" ${x.available !== false ? 'checked' : ''} data-product="${x.id}" data-field="available" aria-label="Disponible"></td>
-        <td class="num">${delBtn('product', x.id)}</td></tr>`).join('');
+    $('#product-cats').innerHTML = [...new Set(['Boissons', 'Food', ...productCats()])].map((c) => `<option>${esc(c)}</option>`).join('');
+    if (!f.contains(document.activeElement)) f.shopIntro.value = data.config.shopIntro || '';
+    const list = products();
+    $('#products-admin').innerHTML = list.map((x, i) => `
+      <div class="edit-card ${x.available === false ? 'off' : ''}">
+        <div class="head"><div class="prize-mini">${(x.photos || [])[0] ? `<img src="${esc(imgSrc(x.photos[0]))}" alt="">` : esc(initials(x.name || '?'))}</div>
+          <input value="${esc(x.name)}" data-product="${x.id}" data-field="name" aria-label="Nom"></div>
+        <div class="row2">
+          <label class="mini-field">Catégorie<input value="${esc(x.category)}" data-product="${x.id}" data-field="category" list="product-cats"></label>
+          <label class="mini-field">Max / commande<input type="number" min="1" max="50" value="${esc(maxOf(x))}" data-product="${x.id}" data-field="max"></label>
+        </div>
+        <label class="mini-field">Description<textarea rows="2" data-product="${x.id}" data-field="desc">${esc(x.desc)}</textarea></label>
+        ${(x.photos || []).length ? `<div class="thumbs">${x.photos.map((src, k) => thumb(src, x.name, `<span class="thumb-x" role="button" data-del-photo="product" data-id="${x.id}" data-index="${k}" aria-label="Retirer">✕</span>`)).join('')}</div>` : ''}
+        <label class="check-row"><input type="checkbox" ${x.available !== false ? 'checked' : ''} data-product="${x.id}" data-field="available"> <span>Disponible</span></label>
+        <div class="foot">
+          <span class="toolbar"><label class="btn btn-ghost btn-sm file-btn">+ Photos<input type="file" accept="image/*" multiple data-upload="product" data-id="${x.id}"></label>
+          <span class="order-btns"><button class="btn btn-ghost btn-sm" type="button" data-move="-1" data-id="${x.id}" ${i === 0 ? 'disabled' : ''} aria-label="Monter">↑</button><button class="btn btn-ghost btn-sm" type="button" data-move="1" data-id="${x.id}" ${i === list.length - 1 ? 'disabled' : ''} aria-label="Descendre">↓</button></span></span>
+          ${delBtn('product', x.id)}
+        </div>
+        <span class="upload-note" id="up-${x.id}"></span>
+      </div>`).join('') || '<p class="faint">Aucune proposition pour le moment.</p>';
   }
 
   // Jeu concours (Espace liste)
@@ -1233,7 +1248,7 @@
   }
 
   function renderPublic() {
-    renderHeader(); renderHeroFacts(); renderDays(); renderAgenda(); renderFoodGrid(); renderServices(); renderMembersPublic(); renderShop(); renderContest(); renderPartners(); renderQuick();
+    renderHeader(); renderHeroFacts(); renderDays(); renderAgenda(); renderFoodGrid(); renderMembersPublic(); renderShop(); renderContest(); renderPartners(); renderQuick();
   }
   function renderAll() { renderPublic(); renderAdmin(); }
 
@@ -1329,11 +1344,6 @@
     btn.disabled = false;
   });
 
-  $('#service-form').addEventListener('submit', (e) => {
-    e.preventDefault();
-    data.services.push({ id: uid('s'), ...formData(e.target) });
-    e.target.reset(); save();
-  });
 
   $('#member-form').addEventListener('submit', (e) => {
     e.preventDefault();
@@ -1388,8 +1398,13 @@
     const delPhoto = e.target.closest('[data-del-photo]');
     if (delPhoto) {
       e.stopPropagation();
-      const pa = (data.partners || []).find((x) => x.id === delPhoto.dataset.id);
-      if (pa && confirm('Retirer cette photo ?')) { pa.photos.splice(Number(delPhoto.dataset.index), 1); save(); }
+      const owner = delPhoto.dataset.delPhoto === 'product' ? findIn('products', delPhoto.dataset.id) : (data.partners || []).find((x) => x.id === delPhoto.dataset.id);
+      if (owner && confirm('Retirer cette photo ?')) { owner.photos.splice(Number(delPhoto.dataset.index), 1); save(); }
+      return;
+    }
+    if (t.dataset.move) {
+      const i = data.products.findIndex((x) => x.id === t.dataset.id); const j = i + Number(t.dataset.move);
+      if (i >= 0 && j >= 0 && j < data.products.length) { [data.products[i], data.products[j]] = [data.products[j], data.products[i]]; save(); }
       return;
     }
     if (t.dataset.del === 'partner' || t.dataset.del === 'prize') {
@@ -1404,7 +1419,7 @@
       const m = findIn('members', t.dataset.id); m.status = t.dataset.mstatus; m.updatedAt = new Date().toISOString(); save(); return;
     }
     if (t.dataset.del) {
-      const map = { budget: 'budget', stock: 'stock', food: 'food', event: 'events', service: 'services', member: 'members', campaign: 'campaigns', product: 'products' };
+      const map = { budget: 'budget', stock: 'stock', food: 'food', event: 'events', member: 'members', campaign: 'campaigns', product: 'products' };
       if (!confirm('Supprimer cet élément ?')) return;
       if (t.dataset.del === 'sub') data.subscribers = data.subscribers.filter((s) => s.email !== t.dataset.id);
       else data[map[t.dataset.del]] = data[map[t.dataset.del]].filter((x) => x.id !== t.dataset.id);
@@ -1443,8 +1458,10 @@
         const id = t.dataset.id;
         const note = $(`#up-${id}`) || $('#contest-admin-status');
         try {
-          const files = await storeImages(t.files, t.dataset.upload.startsWith('partner') ? 'partenaire' : 'lot', note);
-          if (t.dataset.upload === 'prize') {
+          const files = await storeImages(t.files, t.dataset.upload.startsWith('partner') ? 'partenaire' : t.dataset.upload === 'product' ? 'commande' : 'lot', note);
+          if (t.dataset.upload === 'product') {
+            const x = findIn('products', id); x.photos = [...(x.photos || []), ...files];
+          } else if (t.dataset.upload === 'prize') {
             data.contest = { ...contest(), prizes: (contest().prizes || []).map((x) => (x.id === id ? { ...x, photo: files[0] } : x)) };
           } else {
             const pa = (data.partners || []).find((x) => x.id === id);
@@ -1465,7 +1482,7 @@
     }
     if (t.dataset.product) {
       const x = findIn('products', t.dataset.product);
-      x[t.dataset.field] = t.type === 'checkbox' ? t.checked : t.type === 'number' ? Math.max(1, Number(t.value) || 1) : t.value;
+      x[t.dataset.field] = t.type === 'checkbox' ? t.checked : t.type === 'number' ? Math.max(1, Number(t.value) || 1) : t.value.trim();
       t.blur(); save(); return;
     }
     if (t.dataset.qty) { findIn('stock', t.dataset.qty).quantity = Math.max(0, Number(t.value) || 0); t.blur(); save(); }
@@ -1478,16 +1495,21 @@
   $('#shop-form').addEventListener('submit', (e) => {
     e.preventDefault();
     const f = e.target;
-    data.config = { ...data.config, ordersOpen: f.ordersOpen.checked, orderWebhook: f.orderWebhook.value.trim(), deliveryNote: f.deliveryNote.value.trim() };
+    data.config = { ...data.config, ordersOpen: f.ordersOpen.checked, orderWebhook: f.orderWebhook.value.trim(), deliveryNote: f.deliveryNote.value.trim(), shopIntro: f.shopIntro.value.trim() };
     save();
     $('#shop-status').textContent = token() ? 'Enregistré et publié.' : 'Enregistré sur cet appareil.';
   });
-  $('#product-form').addEventListener('submit', (e) => {
+  $('#product-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const d = formData(e.target);
-    if (!Array.isArray(data.products)) data.products = [];
-    data.products.push({ id: uid('p'), name: d.name.trim(), category: d.category.trim() || 'Autres', desc: d.desc.trim(), max: Math.max(1, Number(d.max) || 1), available: true });
-    e.target.reset(); save();
+    const f = e.target;
+    const btn = f.querySelector('button[type=submit]'); btn.disabled = true;
+    try {
+      const photos = await storeImages(f.photos.files, 'commande', $('#product-status'));
+      if (!Array.isArray(data.products)) data.products = [];
+      data.products.push({ id: uid('p'), name: f.name.value.trim(), category: f.category.value.trim() || 'Autres', desc: f.desc.value.trim(), max: Math.max(1, Number(f.max.value) || 1), available: true, photos });
+      f.reset(); save();
+    } catch (err) { $('#product-status').textContent = err.message; }
+    btn.disabled = false;
   });
 
   $('#settings-form').addEventListener('submit', async (e) => {

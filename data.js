@@ -306,26 +306,6 @@ window.JE_DATA = {
       "served": 0
     }
   ],
-  "services": [
-    {
-      "id": "s1",
-      "title": "Chargeurs de téléphone",
-      "description": "Prêt de chargeurs au local, contre une carte étudiante.",
-      "where": "Local BDE"
-    },
-    {
-      "id": "s2",
-      "title": "Covoit' soirée",
-      "description": "Retours de soirée organisés par la liste, sur inscription.",
-      "where": "Demander à Inès"
-    },
-    {
-      "id": "s3",
-      "title": "Impression & reliure",
-      "description": "Impression gratuite de vos rapports (dans la limite de 20 pages).",
-      "where": "Accueil bâtiment B"
-    }
-  ],
   "publishedAt": "2026-10-09T15:23:10.734Z",
   "products": [
     {
@@ -334,7 +314,8 @@ window.JE_DATA = {
       "category": "Boissons",
       "desc": "Bien frais, livré là où vous êtes.",
       "max": 2,
-      "available": true
+      "available": true,
+      "photos": []
     },
     {
       "id": "p2",
@@ -342,7 +323,8 @@ window.JE_DATA = {
       "category": "Boissons",
       "desc": "Expresso ou allongé, à préciser.",
       "max": 2,
-      "available": true
+      "available": true,
+      "photos": []
     },
     {
       "id": "p3",
@@ -350,7 +332,8 @@ window.JE_DATA = {
       "category": "Boissons",
       "desc": "Orange ou multifruit.",
       "max": 2,
-      "available": true
+      "available": true,
+      "photos": []
     },
     {
       "id": "p4",
@@ -358,7 +341,8 @@ window.JE_DATA = {
       "category": "Food",
       "desc": "La classique.",
       "max": 3,
-      "available": true
+      "available": true,
+      "photos": []
     },
     {
       "id": "p5",
@@ -366,7 +350,8 @@ window.JE_DATA = {
       "category": "Food",
       "desc": "Généreusement garnie.",
       "max": 3,
-      "available": true
+      "available": true,
+      "photos": []
     },
     {
       "id": "p6",
@@ -374,7 +359,8 @@ window.JE_DATA = {
       "category": "Food",
       "desc": "Version salée, bien chaude.",
       "max": 2,
-      "available": true
+      "available": true,
+      "photos": []
     },
     {
       "id": "p7",
@@ -382,7 +368,8 @@ window.JE_DATA = {
       "category": "Services",
       "desc": "On passe faire le ménage, sur le créneau de votre choix.",
       "max": 1,
-      "available": true
+      "available": true,
+      "photos": []
     },
     {
       "id": "p8",
@@ -390,7 +377,8 @@ window.JE_DATA = {
       "category": "Services",
       "desc": "Viennoiserie, jus et café livrés en chambre le matin.",
       "max": 1,
-      "available": true
+      "available": true,
+      "photos": []
     }
   ],
   "partners": [

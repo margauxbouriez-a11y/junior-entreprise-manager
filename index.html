@@ -555,6 +555,17 @@
   .partner-link { font-weight: 600; font-size: 14px; color: var(--gold); text-decoration: none; margin-top: auto; }
 
   /* Espace liste : cartes d'édition */
+  .item .ph { display: block; width: calc(100% + 44px); margin: -22px -22px 10px; aspect-ratio: 4 / 3; padding: 0; border: 0; border-bottom: 1px solid rgba(255, 255, 255, .16); border-radius: 6px 6px 0 0; overflow: hidden; background: var(--royal-deep); cursor: zoom-in; position: relative; }
+  .item .ph img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .3s; }
+  .item .ph:hover img { transform: scale(1.04); }
+  .item .ph .more { position: absolute; right: 8px; bottom: 8px; padding: 2px 8px; border-radius: 999px; background: rgba(0, 20, 92, .8); font-size: 12px; font-weight: 600; color: #fff; }
+  .cart-line .cl-name { display: flex; gap: 10px; align-items: center; min-width: 0; }
+  .cart-line .cl-name img { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; flex: 0 0 auto; }
+  .edit-card .row2 { display: grid; grid-template-columns: 1fr 110px; gap: 8px; }
+  .edit-card .mini-field { display: grid; gap: 4px; font-size: 12px; color: var(--text-3); }
+  .edit-card .check-row { font-size: 13px; }
+  .edit-card.off { opacity: .7; }
+  .order-btns { display: inline-flex; gap: 4px; }
   .admin-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
   .edit-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; display: grid; gap: 10px; }
   .edit-card .head { display: flex; gap: 12px; align-items: center; }
@@ -668,7 +679,7 @@
       <img class="poster-logo" src="assets/logo.jpg" alt="Logo de la liste Leclercq des étoiles" width="900" height="900">
       <p class="rule" id="hero-kicker">HEC Paris · Campagne</p>
       <h1 class="display"><span class="sr-only" id="hero-name">Leclercq des étoiles — </span><span id="hero-title">La campagne commence</span></h1>
-      <p class="poster-lede">Deux semaines d'événements, de stands food et de services offerts. Tout le programme, en direct.</p>
+      <p class="poster-lede">Deux semaines d'événements, de stands food et de commandes offertes. Tout le programme, en direct.</p>
       <div class="poster-cta">
         <a class="btn btn-accent btn-lg" href="#commander">Commander — c'est offert</a>
         <a class="btn btn-outline-light btn-lg" href="#programme">Voir le programme</a>
@@ -731,7 +742,7 @@
         <div>
           <p class="kicker">Boutique</p>
           <h2>Commandez, on livre</h2>
-          <p id="shop-intro">Boissons, crêpes et services, offerts par la liste et livrés sur le campus.</p>
+          <p id="shop-intro">Boissons, crêpes et plus encore, offerts par la liste et livrés sur le campus.</p>
         </div>
         <div class="seg" id="shop-cats"></div>
       </div>
@@ -823,19 +834,6 @@
       </div>
       <div class="team-bar" id="team-bar"></div>
       <div class="people" id="members-public"></div>
-    </div>
-  </section>
-
-  <section id="services">
-    <div class="wrap">
-      <div class="s-head">
-        <div>
-          <p class="kicker">Services</p>
-          <h2>À votre service</h2>
-          <p>Ce que la liste met à votre disposition pendant toute la campagne.</p>
-        </div>
-      </div>
-      <div class="services" id="services-grid"></div>
     </div>
   </section>
 
@@ -1015,6 +1013,7 @@
           <h3>Réglages de la boutique</h3>
           <label class="check-row"><input type="checkbox" name="ordersOpen"> <span>Boutique ouverte (les étudiants peuvent commander)</span></label>
           <label class="field"><span>Webhook des commandes (URL de production n8n)</span><input name="orderWebhook" type="url" placeholder="https://….app.n8n.cloud/webhook/leclercq-commandes"></label>
+          <label class="field"><span>Texte sous le titre « Commandez, on livre »</span><input name="shopIntro" placeholder="Boissons, crêpes et plus encore, offerts par la liste et livrés sur le campus."></label>
           <label class="field"><span>Infos de livraison affichées aux étudiants</span><input name="deliveryNote" placeholder="Livraison en chambre ou au stand, sur le campus."></label>
           <div class="toolbar"><button class="btn" type="submit">Enregistrer</button></div>
           <p class="note" id="shop-status"></p>
@@ -1022,18 +1021,21 @@
         <div class="card panel">
           <h3>Comment arrivent les commandes ?</h3>
           <p class="muted" style="margin-top:0">Chaque commande part vers le webhook n8n, qui envoie un mail à la liste (avec le numéro de commande et le détail) et un récapitulatif à l'étudiant. Le workflow prêt à importer est dans <code>n8n/commandes-workflow.json</code>.</p>
-          <p class="muted">Pour suspendre un produit (rupture, stand fermé), décochez « Dispo » dans le catalogue : il apparaît « Épuisé » sur le site.</p>
+          <p class="muted">Pour suspendre une proposition (rupture, stand fermé), décochez « Disponible » : elle apparaît « Épuisé » sur le site. Les flèches ↑ ↓ changent l'ordre d'affichage.</p>
         </div>
       </div>
-      <h3 class="sub-head">Catalogue</h3>
-      <div class="table-wrap"><table id="products-table"></table></div>
-      <h3 class="sub-head">Ajouter un produit ou un service</h3>
+      <h3 class="sub-head">Les propositions</h3>
+      <p class="muted" style="margin:-4px 0 14px">Chaque champ est enregistré dès que vous quittez la case. Ajoutez des photos de ce que les gens commandent : elles s'affichent sur la carte de la boutique.</p>
+      <div class="admin-cards" id="products-admin"></div>
+      <h3 class="sub-head">Ajouter une proposition</h3>
       <form id="product-form" class="form-grid card panel">
         <label class="field"><span>Nom</span><input name="name" required placeholder="Crêpe Nutella"></label>
-        <label class="field"><span>Catégorie</span><input name="category" list="product-cats" required placeholder="Food, Boissons, Services…"></label>
+        <label class="field"><span>Catégorie</span><input name="category" list="product-cats" required placeholder="Food, Boissons…"></label>
         <label class="field"><span>Maximum par commande</span><input name="max" type="number" min="1" max="50" value="2" required></label>
         <label class="field"><span>Description</span><input name="desc" placeholder="Courte description"></label>
+        <label class="field"><span>Photos <em>(facultatif)</em></span><input type="file" name="photos" accept="image/*" multiple></label>
         <button class="btn" type="submit">Ajouter</button>
+        <p class="note" id="product-status"></p>
         <datalist id="product-cats"></datalist>
       </form>
     </div>
@@ -1114,14 +1116,6 @@
         <p class="note" id="event-status"></p>
         <div class="toolbar"><button class="btn" type="submit">Enregistrer</button><button class="btn btn-ghost" type="reset" id="event-cancel">Annuler</button></div>
         <datalist id="event-cats"><option>Soirée</option><option>Sport</option><option>Conférence</option><option>Atelier</option><option>Networking</option><option>Food</option></datalist>
-      </form>
-      <h3 class="sub-head">Services affichés</h3>
-      <div class="table-wrap"><table id="services-table"></table></div>
-      <form id="service-form" class="form-grid card panel" style="margin-top:14px">
-        <label class="field"><span>Service</span><input name="title" required></label>
-        <label class="field"><span>Description</span><input name="description" required></label>
-        <label class="field"><span>Où / qui</span><input name="where"></label>
-        <button class="btn" type="submit">Ajouter</button>
       </form>
     </div>
 
