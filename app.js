@@ -346,13 +346,13 @@
   function renderHeader() {
     const name = data.config.listName;
     const tagline = data.config.tagline || '';
-    document.title = `${name} — Campagne${tagline ? ` · ${tagline}` : ''}`;
+    document.title = `Liste ${name} — Junior Entreprise${tagline ? ` ${tagline}` : ''}`;
     $('#brand-name').textContent = name;
     $('#brand-sub').textContent = tagline;
     $('#hero-name').textContent = name;
     $('#login-mark').textContent = name;
     $('#footer-name').textContent = name;
-    $('#footer-tagline').textContent = tagline ? `Liste · ${tagline}` : 'Liste';
+    $('#footer-tagline').textContent = tagline ? `Liste Junior Entreprise · ${tagline}` : 'Liste Junior Entreprise';
     $('#footer-copy').textContent = `© ${new Date().getFullYear()} ${name}`;
     const mail = $('#footer-mail');
     mail.hidden = !data.config.contactEmail;
