@@ -4,7 +4,7 @@ window.JE_DATA = {
   "config": {
     "listName": "Leclercq des étoiles",
     "tagline": "HEC Paris",
-    "campaignStart": "2026-10-12",
+    "campaignStart": "2026-11-01",
     "campaignDays": 14,
     "signupWebhook": "",
     "contactEmail": "",
@@ -115,7 +115,7 @@ window.JE_DATA = {
     {
       "id": "e1",
       "title": "Lancement de campagne",
-      "date": "2026-10-12",
+      "date": "2026-11-01",
       "start": "12:00",
       "end": "14:00",
       "place": "Cour centrale",
@@ -126,7 +126,7 @@ window.JE_DATA = {
     {
       "id": "e2",
       "title": "Tournoi de baby-foot",
-      "date": "2026-10-13",
+      "date": "2026-11-02",
       "start": "17:00",
       "end": "20:00",
       "place": "Foyer",
@@ -137,7 +137,7 @@ window.JE_DATA = {
     {
       "id": "e3",
       "title": "Conférence entrepreneuriat",
-      "date": "2026-10-14",
+      "date": "2026-11-03",
       "start": "18:00",
       "end": "19:30",
       "place": "Amphi A",
@@ -148,7 +148,7 @@ window.JE_DATA = {
     {
       "id": "e4",
       "title": "Blind test",
-      "date": "2026-10-15",
+      "date": "2026-11-04",
       "start": "19:00",
       "end": "21:00",
       "place": "Foyer",
@@ -163,7 +163,7 @@ window.JE_DATA = {
     {
       "id": "e5",
       "title": "Afterwork partenaires",
-      "date": "2026-10-16",
+      "date": "2026-11-05",
       "start": "18:30",
       "end": "21:00",
       "place": "Terrasse",
@@ -174,7 +174,7 @@ window.JE_DATA = {
     {
       "id": "e6",
       "title": "Petit-déj offert",
-      "date": "2026-10-19",
+      "date": "2026-11-08",
       "start": "08:00",
       "end": "10:00",
       "place": "Hall principal",
@@ -185,7 +185,7 @@ window.JE_DATA = {
     {
       "id": "e7",
       "title": "Atelier CV & LinkedIn",
-      "date": "2026-10-20",
+      "date": "2026-11-09",
       "start": "12:30",
       "end": "14:00",
       "place": "Salle B12",
@@ -196,7 +196,7 @@ window.JE_DATA = {
     {
       "id": "e8",
       "title": "Olympiades inter-promos",
-      "date": "2026-10-21",
+      "date": "2026-11-10",
       "start": "14:00",
       "end": "18:00",
       "place": "Stade",
@@ -207,7 +207,7 @@ window.JE_DATA = {
     {
       "id": "e9",
       "title": "Karaoké",
-      "date": "2026-10-22",
+      "date": "2026-11-11",
       "start": "20:00",
       "end": "23:00",
       "place": "Foyer",
@@ -218,7 +218,7 @@ window.JE_DATA = {
     {
       "id": "e10",
       "title": "Soirée de clôture",
-      "date": "2026-10-23",
+      "date": "2026-11-12",
       "start": "21:00",
       "end": "02:00",
       "place": "Salle des fêtes",
@@ -231,7 +231,7 @@ window.JE_DATA = {
     {
       "id": "f1",
       "name": "Crêpes",
-      "date": "2026-10-12",
+      "date": "2026-11-01",
       "start": "11:30",
       "end": "14:00",
       "place": "Cour centrale",
@@ -242,7 +242,7 @@ window.JE_DATA = {
     {
       "id": "f2",
       "name": "Hot-dogs",
-      "date": "2026-10-13",
+      "date": "2026-11-02",
       "start": "12:00",
       "end": "14:00",
       "place": "Hall principal",
@@ -253,7 +253,7 @@ window.JE_DATA = {
     {
       "id": "f3",
       "name": "Pizza party",
-      "date": "2026-10-15",
+      "date": "2026-11-04",
       "start": "12:00",
       "end": "14:00",
       "place": "Cafét'",
@@ -264,7 +264,7 @@ window.JE_DATA = {
     {
       "id": "f4",
       "name": "Smoothies",
-      "date": "2026-10-16",
+      "date": "2026-11-05",
       "start": "15:00",
       "end": "17:00",
       "place": "Terrasse",
@@ -275,7 +275,7 @@ window.JE_DATA = {
     {
       "id": "f5",
       "name": "Petit-déj",
-      "date": "2026-10-19",
+      "date": "2026-11-08",
       "start": "08:00",
       "end": "10:00",
       "place": "Hall principal",
@@ -286,7 +286,7 @@ window.JE_DATA = {
     {
       "id": "f6",
       "name": "Burgers",
-      "date": "2026-10-21",
+      "date": "2026-11-10",
       "start": "12:00",
       "end": "14:00",
       "place": "Cour centrale",
@@ -297,7 +297,7 @@ window.JE_DATA = {
     {
       "id": "f7",
       "name": "Gaufres",
-      "date": "2026-10-22",
+      "date": "2026-11-11",
       "start": "16:00",
       "end": "18:00",
       "place": "Hall principal",
@@ -405,7 +405,7 @@ window.JE_DATA = {
     "open": true,
     "title": "Le grand jeu concours Leclercq",
     "desc": "Inscrivez-vous en 30 secondes pour tenter de gagner les lots de la liste. Tirage au sort à la fin de la campagne.",
-    "endsAt": "2026-10-25T20:00",
+    "endsAt": "2026-11-14T20:00",
     "rules": "Jeu gratuit et sans obligation, réservé aux étudiants du campus HEC Paris. Une seule inscription par personne (adresse e-mail). Tirage au sort à la fin de la campagne ; le ou la gagnante est contacté·e par e-mail.",
     "webhook": "",
     "sheetUrl": "",
