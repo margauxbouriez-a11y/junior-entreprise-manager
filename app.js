@@ -20,8 +20,8 @@
   // data.js contient la partie publique en clair (programme, food, équipe…) et la
   // partie privée (budget, stocks, abonnés, campagnes) chiffrée avec le code
   // d'accès de la liste : seuls les membres qui ont le code peuvent la lire.
-  const PRIVATE_KEYS = ['budget', 'budgetCap', 'stock', 'subscribers', 'campaigns'];
-  const PRIVATE_DEFAULTS = { budget: [], budgetCap: 0, stock: [], subscribers: [], campaigns: [] };
+  const PRIVATE_KEYS = ['budget', 'budgetCap', 'stock', 'subscribers', 'campaigns', 'adhesionsKey'];
+  const PRIVATE_DEFAULTS = { budget: [], budgetCap: 0, stock: [], subscribers: [], campaigns: [], adhesionsKey: '' };
   const splitData = (full) => {
     const pub = {}; const priv = {};
     Object.keys(full).forEach((k) => { (PRIVATE_KEYS.includes(k) ? priv : pub)[k] = full[k]; });
@@ -766,6 +766,140 @@
     } finally { btn.disabled = false; }
   });
 
+  // ---------- Cotisation et soutien actif (via n8n + Google Sheet) ----------
+  // Les déclarations partent vers le webhook n8n « adhesions » ; l'Espace liste
+  // lit et coche les lignes via la même adresse suivie de « -admin », avec la clé secrète.
+  const cotisation = () => data.cotisation || {};
+  const soutienCfg = () => data.soutien || {};
+  const goodies = () => (Array.isArray(data.goodies) ? data.goodies : []);
+  const adhUrl = () => String(data.config.adhesionsWebhook || '').trim();
+  const adhAdminUrl = () => (adhUrl() ? `${adhUrl().replace(/\/+$/, '')}-admin` : '');
+  const shortId = (p) => `${p}-${Date.now().toString(36).slice(-4).toUpperCase()}${Math.floor(10 + Math.random() * 90)}`;
+  const COTI_KEY = 'leclercq-cotisation';
+  const SOUTIEN_KEY = 'leclercq-soutien';
+  let cotiPhoto = '';
+
+  function renderCotisation() {
+    const c = cotisation();
+    $('#cotisation').hidden = c.hidden === true;
+    $('#coti-intro').textContent = c.intro || 'Vous avez payé votre cotisation ? Déclarez-le ici et récupérez votre cadeau.';
+    const perks = c.perks || [];
+    $('#coti-perks').innerHTML = perks.length ? perks.map((pr) => `
+      <div class="prize">
+        <button type="button" class="ph" ${pr.photo ? `data-zoom="${esc(pr.photo)}" data-caption="${esc(pr.name)}"` : ''}>${pr.photo ? `<img src="${esc(imgSrc(pr.photo))}" alt="${esc(pr.name)}" loading="lazy">` : GIFT}</button>
+        <div class="cap"><small>Offert aux cotisants</small><b>${esc(pr.name)}</b>${pr.desc ? `<span class="perk-desc">${esc(pr.desc)}</span>` : ''}</div>
+      </div>`).join('') : `<div class="prize"><div class="ph">${GIFT}</div><div class="cap"><small>Cadeau</small><b>Bientôt dévoilé</b></div></div>`;
+    const done = storage.get(COTI_KEY);
+    const state = c.open === false ? 'closed' : !adhUrl() ? 'soon' : 'open';
+    $('#coti-form').hidden = state !== 'open' || !!done;
+    $('#coti-done').hidden = !(done || state !== 'open');
+    $('#coti-done').innerHTML = done
+      ? `<b>C'est noté !</b><p class="muted">Merci pour votre cotisation. Un membre de la liste vous apporte votre cadeau en chambre.</p><p class="faint" style="margin-top:8px">Référence ${esc(done)}</p><button class="link-btn" type="button" data-coti-again style="margin-top:12px">Déclarer une autre personne</button>`
+      : state === 'closed' ? '<b>Déclarations fermées</b><p class="muted">Écrivez-nous si vous avez cotisé et pas encore reçu votre cadeau.</p>'
+        : '<b>Bientôt ouvert</b><p class="muted">Revenez très vite pour déclarer votre cotisation.</p>';
+  }
+
+  $('#coti-form').photo.addEventListener('change', async (e) => {
+    cotiPhoto = '';
+    $('#coti-preview').innerHTML = '';
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      cotiPhoto = await resizeImage(file, 1200, 0.72);
+      $('#coti-preview').innerHTML = `<img src="${cotiPhoto}" alt="Aperçu de la photo">`;
+      $('#coti-status').textContent = '';
+    } catch (err) {
+      e.target.value = '';
+      $('#coti-status').className = 'note err'; $('#coti-status').textContent = err.message;
+    }
+  });
+  $('#coti-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const status = $('#coti-status');
+    status.className = 'note';
+    if (!form.reportValidity()) return;
+    if (!cotiPhoto) { status.className = 'note err'; status.textContent = 'Ajoutez une photo qui prouve le paiement.'; return; }
+    const id = shortId('CO');
+    const payload = {
+      type: 'cotisation', id,
+      firstName: form.firstName.value.trim(), lastName: form.lastName.value.trim(), room: form.room.value.trim(),
+      photo: cotiPhoto, website: form.website.value, list: data.config.listName,
+    };
+    const finish = () => { storage.set(COTI_KEY, id); form.reset(); cotiPhoto = ''; $('#coti-preview').innerHTML = ''; status.textContent = ''; renderCotisation(); };
+    if (payload.website) { finish(); return; }
+    const btn = form.querySelector('button[type=submit]');
+    btn.disabled = true; status.textContent = 'Envoi en cours…';
+    try {
+      const res = await postToWebhook(adhUrl(), payload);
+      if (res && res.ok === false) throw new Error(res.error || 'refus');
+      finish();
+    } catch {
+      status.className = 'note err';
+      status.textContent = "L'envoi n'est pas passé. Vérifiez votre connexion et réessayez.";
+    } finally { btn.disabled = false; }
+  });
+  $('#coti-done').addEventListener('click', (e) => {
+    if (e.target.closest('[data-coti-again]')) { storage.remove(COTI_KEY); renderCotisation(); }
+  });
+
+  function renderSoutien() {
+    const s = soutienCfg();
+    const list = goodies();
+    $('#soutien').hidden = s.hidden === true;
+    $('#soutien-intro').textContent = s.intro || 'Choisissez les goodies que vous voulez, on vous les remet pendant la campagne.';
+    const checked = new Set($$('#goodies-grid input:checked').map((x) => x.value));
+    $('#goodies-grid').innerHTML = list.length ? list.map((g) => {
+      const off = g.available === false;
+      const photo = (g.photos || [])[0];
+      return `<label class="goodie ${off ? 'off' : ''}">
+        <input type="checkbox" name="goodie" value="${esc(g.id)}" ${off ? 'disabled' : ''} ${checked.has(g.id) && !off ? 'checked' : ''}>
+        <span class="ph">${photo ? `<img src="${esc(imgSrc(photo))}" alt="${esc(g.name)}" loading="lazy">` : GIFT}</span>
+        <span class="cap"><b>${esc(g.name)}</b>${off ? '<small>Épuisé</small>' : g.desc ? `<small>${esc(g.desc)}</small>` : ''}</span>
+        <span class="tick" aria-hidden="true">✓</span>
+      </label>`;
+    }).join('') : '<div class="empty" style="grid-column:1/-1">Les goodies arrivent bientôt.</div>';
+    const done = storage.get(SOUTIEN_KEY);
+    const state = s.open === false ? 'closed' : !adhUrl() || !list.length ? 'soon' : 'open';
+    $('#soutien-form').hidden = !!done;
+    $('#soutien-bar').hidden = state !== 'open';
+    $$('#goodies-grid input').forEach((x) => { if (state !== 'open') x.disabled = true; });
+    $('#soutien-done').hidden = !(done || state !== 'open');
+    $('#soutien-done').innerHTML = done
+      ? `<b>Merci pour votre soutien !</b><p class="muted">Vos goodies sont réservés : ${esc(done)}.</p><button class="link-btn" type="button" data-soutien-again style="margin-top:12px">Faire une autre demande</button>`
+      : state === 'closed' ? '<b>Demandes fermées</b>' : '<b>Bientôt ouvert</b><p class="muted">Revenez très vite pour choisir vos goodies.</p>';
+  }
+  $('#soutien-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const status = $('#soutien-status');
+    status.className = 'note';
+    const ids = $$('#goodies-grid input:checked').map((x) => x.value);
+    const names = ids.map((id) => (goodies().find((g) => g.id === id) || {}).name).filter(Boolean);
+    if (!names.length) { status.className = 'note err'; status.textContent = 'Cochez au moins un goodie.'; return; }
+    if (!form.reportValidity()) return;
+    const payload = {
+      type: 'soutien', id: shortId('SO'),
+      firstName: form.firstName.value.trim(), lastName: form.lastName.value.trim(),
+      goodies: names.join(', '), website: form.website.value, list: data.config.listName,
+    };
+    const finish = () => { storage.set(SOUTIEN_KEY, payload.goodies); form.reset(); status.textContent = ''; renderSoutien(); };
+    if (payload.website) { finish(); return; }
+    const btn = form.querySelector('button[type=submit]');
+    btn.disabled = true; status.textContent = 'Envoi en cours…';
+    try {
+      const res = await postToWebhook(adhUrl(), payload);
+      if (res && res.ok === false) throw new Error(res.error || 'refus');
+      finish();
+    } catch {
+      status.className = 'note err';
+      status.textContent = "L'envoi n'est pas passé. Réessayez dans un instant.";
+    } finally { btn.disabled = false; }
+  });
+  $('#soutien-done').addEventListener('click', (e) => {
+    if (e.target.closest('[data-soutien-again]')) { storage.remove(SOUTIEN_KEY); renderSoutien(); }
+  });
+
   // ---------- Partenaires ----------
   function renderPartners() {
     const list = Array.isArray(data.partners) ? data.partners : [];
@@ -916,6 +1050,7 @@
     currentTab = tab;
     $$('#admin-tabs button').forEach((x) => x.classList.toggle('on', x.dataset.tab === tab));
     $$('[data-panel]').forEach((p) => { p.hidden = p.dataset.panel !== tab; });
+    if (tab === 'cotisations' || tab === 'soutien') loadAdhesions();
   }
   $('#admin-tabs').addEventListener('click', (e) => {
     const b = e.target.closest('[data-tab]'); if (b) goTab(b.dataset.tab);
@@ -1200,6 +1335,124 @@
       </div>`).join('') || '<p class="faint">Aucun lot pour le moment.</p>';
   }
 
+  // Cotisations et soutien actif (Espace liste) : tableaux lus dans le Google Sheet via n8n
+  const adh = { loading: false, error: '', at: null, rows: { cotisations: [], soutien: [] }, filter: { cotisations: 'all', soutien: 'all' } };
+  async function adhRequest(payload) {
+    if (!adhAdminUrl()) throw new Error("Réglez d'abord le webhook n8n (onglet Cotisations).");
+    if (!data.adhesionsKey) throw new Error("Réglez d'abord la clé secrète (onglet Cotisations).");
+    let res;
+    try { res = await postToWebhook(adhAdminUrl(), { key: data.adhesionsKey, ...payload }); } catch { throw new Error('n8n injoignable. Vérifiez que le workflow est publié.'); }
+    if (!res || res.ok !== true) throw new Error(res && res.error === 'cle' ? 'Clé secrète refusée par n8n.' : 'Réponse inattendue de n8n.');
+    return res;
+  }
+  async function loadAdhesions() {
+    if (!isAdmin || adh.loading) return;
+    if (!adhAdminUrl() || !data.adhesionsKey) { adh.error = ''; renderAdhAdmin(); return; }
+    adh.loading = true; renderAdhAdmin();
+    try {
+      const res = await adhRequest({ action: 'list' });
+      adh.rows.cotisations = Array.isArray(res.cotisations) ? res.cotisations : [];
+      adh.rows.soutien = Array.isArray(res.soutien) ? res.soutien : [];
+      adh.error = ''; adh.at = new Date();
+    } catch (err) { adh.error = err.message; }
+    adh.loading = false; renderAdhAdmin();
+  }
+  async function setDelivered(sheet, id, value) {
+    const row = adh.rows[sheet].find((r) => String(r.id) === String(id));
+    if (!row) return;
+    const before = row.done;
+    row.done = value; renderAdhAdmin();
+    try { await adhRequest({ action: 'set', sheet, id: row.id, value: value ? 'Oui' : 'Non' }); }
+    catch (err) { row.done = before; adh.error = err.message; renderAdhAdmin(); }
+  }
+  const fullName = (r) => `${r.firstName || ''} ${r.lastName || ''}`.trim();
+  const matches = (r, q, extra) => !q || [fullName(r), r.lastName, r.firstName, extra].join(' ').toLowerCase().includes(q);
+  function adhRowsFor(sheet) {
+    const q = ($(sheet === 'cotisations' ? '#coti-search' : '#soutien-search').value || '').trim().toLowerCase();
+    const f = adh.filter[sheet];
+    return adh.rows[sheet]
+      .filter((r) => (f === 'todo' ? !r.done : f === 'done' ? r.done : true))
+      .filter((r) => matches(r, q, sheet === 'cotisations' ? r.room : r.goodies))
+      .sort((a, b) => Number(a.done) - Number(b.done) || String(a.lastName || '').localeCompare(String(b.lastName || ''), 'fr'));
+  }
+  function adhEmpty(sheet, cols) {
+    const msg = !adhUrl() || !data.adhesionsKey ? 'Réglez la connexion n8n (webhook et clé secrète) pour voir la liste.'
+      : adh.loading && !adh.at ? 'Chargement…'
+        : adh.error ? esc(adh.error)
+          : adh.rows[sheet].length ? 'Aucun résultat.' : 'Personne pour le moment.';
+    return `<tr><td colspan="${cols}" class="faint" style="text-align:center;padding:24px">${msg}</td></tr>`;
+  }
+  function adhSum(sheet, label) {
+    const all = adh.rows[sheet];
+    const done = all.filter((r) => r.done).length;
+    const when = adh.loading ? 'Actualisation…' : adh.error && adh.at ? `<span style="color:var(--bad)">${esc(adh.error)}</span>` : adh.at ? `à jour à ${adh.at.toTimeString().slice(0, 5).replace(':', 'h')}` : '';
+    return `<b>${num(all.length)}</b> ${all.length > 1 ? 'personnes' : 'personne'} · <b>${num(done)}</b> ${done > 1 ? `${label}s` : label} ${when ? `· ${when}` : ''}`;
+  }
+  function renderAdhAdmin() {
+    if (!isAdmin) return;
+    const cRows = adhRowsFor('cotisations');
+    $('#coti-table').innerHTML = `<thead><tr><th>Prénom</th><th>Nom</th><th>Chambre</th><th>Preuve</th><th>Date</th><th>Sac livré</th></tr></thead><tbody>${cRows.length ? cRows.map((r) => `
+      <tr class="${r.done ? 'is-done' : ''}">
+        <td>${esc(r.firstName)}</td><td><b>${esc(r.lastName)}</b></td><td>${esc(r.room)}</td>
+        <td>${r.proof ? `<a href="${esc(r.proof)}" target="_blank" rel="noopener">Voir la photo</a>` : '<span class="faint">—</span>'}</td>
+        <td class="faint">${esc(r.date)}</td>
+        <td><label class="deliver"><input type="checkbox" data-deliver="cotisations" data-id="${esc(r.id)}" ${r.done ? 'checked' : ''}> ${r.done ? 'Livré' : 'À livrer'}</label></td>
+      </tr>`).join('') : adhEmpty('cotisations', 6)}</tbody>`;
+    $('#coti-sum').innerHTML = adhSum('cotisations', 'livré');
+
+    const sRows = adhRowsFor('soutien');
+    $('#soutien-table').innerHTML = `<thead><tr><th>Prénom</th><th>Nom</th><th>Goodies voulus</th><th>Date</th><th>Donné</th></tr></thead><tbody>${sRows.length ? sRows.map((r) => `
+      <tr class="${r.done ? 'is-done' : ''}">
+        <td>${esc(r.firstName)}</td><td><b>${esc(r.lastName)}</b></td><td>${esc(r.goodies)}</td>
+        <td class="faint">${esc(r.date)}</td>
+        <td><label class="deliver"><input type="checkbox" data-deliver="soutien" data-id="${esc(r.id)}" ${r.done ? 'checked' : ''}> ${r.done ? 'Donné' : 'À donner'}</label></td>
+      </tr>`).join('') : adhEmpty('soutien', 5)}</tbody>`;
+    $('#soutien-sum').innerHTML = adhSum('soutien', 'servi');
+
+    // Combien de chaque goodie
+    const counts = {};
+    adh.rows.soutien.forEach((r) => String(r.goodies || '').split(',').map((x) => x.trim()).filter(Boolean).forEach((n) => {
+      counts[n] = counts[n] || { asked: 0, given: 0 }; counts[n].asked += 1; if (r.done) counts[n].given += 1;
+    }));
+    goodies().forEach((g) => { counts[g.name] = counts[g.name] || { asked: 0, given: 0 }; });
+    const names = Object.keys(counts);
+    $('#goodie-sum').innerHTML = names.length ? names.map((n) => `<span class="chip ${counts[n].asked > counts[n].given ? 'warn' : 'ok'}">${esc(n)} : ${counts[n].asked} · ${counts[n].given} donné${counts[n].given > 1 ? 's' : ''}</span>`).join('') : '<span class="faint">Aucun goodie pour le moment.</span>';
+    $$('#coti-filter [data-afilter]').forEach((b) => b.classList.toggle('on', b.dataset.afilter === adh.filter.cotisations));
+    $$('#soutien-filter [data-afilter]').forEach((b) => b.classList.toggle('on', b.dataset.afilter === adh.filter.soutien));
+  }
+  function renderCotiAdmin() {
+    const c = cotisation();
+    const f = $('#coti-admin-form');
+    if (!f.contains(document.activeElement)) { f.open.checked = c.open !== false; f.intro.value = c.intro || ''; }
+    const a = $('#adhesions-form');
+    if (!a.contains(document.activeElement)) { a.webhook.value = data.config.adhesionsWebhook || ''; a.key.value = data.adhesionsKey || ''; }
+    $('#perks-admin').innerHTML = (c.perks || []).map((pr) => `
+      <div class="edit-card">
+        <div class="head"><div class="prize-mini">${pr.photo ? `<img src="${esc(imgSrc(pr.photo))}" alt="">` : GIFT}</div>
+          <input value="${esc(pr.name)}" data-perk="${pr.id}" data-field="name" aria-label="Cadeau"></div>
+        <textarea rows="2" data-perk="${pr.id}" data-field="desc" placeholder="Description" aria-label="Description">${esc(pr.desc)}</textarea>
+        <div class="foot"><label class="btn btn-ghost btn-sm file-btn">${pr.photo ? 'Changer la photo' : 'Ajouter une photo'}<input type="file" accept="image/*" data-upload="perk" data-id="${pr.id}"></label>
+          <button class="btn btn-danger btn-sm" type="button" data-del="perk" data-id="${pr.id}">Supprimer</button></div>
+        <span class="upload-note" id="up-${pr.id}"></span>
+      </div>`).join('') || '<p class="faint">Aucun cadeau pour le moment.</p>';
+  }
+  function renderSoutienAdmin() {
+    const s = soutienCfg();
+    const f = $('#soutien-admin-form');
+    if (!f.contains(document.activeElement)) { f.open.checked = s.open !== false; f.intro.value = s.intro || ''; }
+    $('#goodies-admin').innerHTML = goodies().map((g) => `
+      <div class="edit-card ${g.available === false ? 'off' : ''}">
+        <div class="head"><div class="prize-mini">${(g.photos || [])[0] ? `<img src="${esc(imgSrc(g.photos[0]))}" alt="">` : GIFT}</div>
+          <input value="${esc(g.name)}" data-goodie="${g.id}" data-field="name" aria-label="Nom du goodie"></div>
+        <textarea rows="2" data-goodie="${g.id}" data-field="desc" placeholder="Description" aria-label="Description">${esc(g.desc)}</textarea>
+        ${(g.photos || []).length ? `<div class="thumbs">${g.photos.map((src, k) => thumb(src, g.name, `<span class="thumb-x" role="button" data-del-photo="goodie" data-id="${g.id}" data-index="${k}" aria-label="Retirer">✕</span>`)).join('')}</div>` : ''}
+        <label class="check-row"><input type="checkbox" ${g.available !== false ? 'checked' : ''} data-goodie="${g.id}" data-field="available"> <span>Disponible</span></label>
+        <div class="foot"><label class="btn btn-ghost btn-sm file-btn">+ Photos<input type="file" accept="image/*" multiple data-upload="goodie" data-id="${g.id}"></label>
+          <button class="btn btn-danger btn-sm" type="button" data-del="goodie" data-id="${g.id}">Supprimer</button></div>
+        <span class="upload-note" id="up-${g.id}"></span>
+      </div>`).join('') || '<p class="faint">Aucun goodie pour le moment. Ajoutez-en un ci-dessous.</p>';
+  }
+
   // Partenaires (Espace liste)
   function renderPartnersAdmin() {
     const list = Array.isArray(data.partners) ? data.partners : [];
@@ -1243,12 +1496,12 @@
     if (!isAdmin) return;
     // Ne pas écraser un champ en cours de saisie
     const active = document.activeElement;
-    if (active && active.matches('#admin-app [data-member], #admin-app [data-qty], #admin-app [data-food], #admin-app [data-product], #admin-app [data-partner], #admin-app [data-prize]')) return;
-    renderKpis(); renderOverview(); renderBudget(); renderStock(); renderEmails(); renderFoodAdmin(); renderShopAdmin(); renderContestAdmin(); renderPartnersAdmin(); renderEventsAdmin(); renderMembersAdmin(); renderSettings();
+    if (active && active.matches('#admin-app [data-member], #admin-app [data-qty], #admin-app [data-food], #admin-app [data-product], #admin-app [data-partner], #admin-app [data-prize], #admin-app [data-goodie], #admin-app [data-perk]')) return;
+    renderKpis(); renderOverview(); renderBudget(); renderStock(); renderEmails(); renderFoodAdmin(); renderShopAdmin(); renderCotiAdmin(); renderSoutienAdmin(); renderAdhAdmin(); renderContestAdmin(); renderPartnersAdmin(); renderEventsAdmin(); renderMembersAdmin(); renderSettings();
   }
 
   function renderPublic() {
-    renderHeader(); renderHeroFacts(); renderDays(); renderAgenda(); renderFoodGrid(); renderMembersPublic(); renderShop(); renderContest(); renderPartners(); renderQuick();
+    renderHeader(); renderHeroFacts(); renderDays(); renderAgenda(); renderFoodGrid(); renderMembersPublic(); renderShop(); renderCotisation(); renderSoutien(); renderContest(); renderPartners(); renderQuick();
   }
   function renderAll() { renderPublic(); renderAdmin(); }
 
@@ -1345,6 +1598,63 @@
   });
 
 
+  // Cotisation / soutien actif : réglages, cadeaux, goodies
+  $('#coti-admin-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const f = e.target;
+    data.cotisation = { ...cotisation(), open: f.open.checked, intro: f.intro.value.trim() };
+    save();
+    $('#coti-admin-status').textContent = token() ? 'Enregistré et publié.' : 'Enregistré sur cet appareil.';
+  });
+  $('#soutien-admin-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const f = e.target;
+    data.soutien = { ...soutienCfg(), open: f.open.checked, intro: f.intro.value.trim() };
+    save();
+    $('#soutien-admin-status').textContent = token() ? 'Enregistré et publié.' : 'Enregistré sur cet appareil.';
+  });
+  $('#adhesions-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const f = e.target;
+    data.config = { ...data.config, adhesionsWebhook: f.webhook.value.trim() };
+    data.adhesionsKey = f.key.value.trim();
+    save();
+    $('#adhesions-status').textContent = token() ? 'Enregistré et publié (la clé reste chiffrée).' : 'Enregistré sur cet appareil.';
+    adh.at = null; loadAdhesions();
+  });
+  $('#perk-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const f = e.target;
+    const btn = f.querySelector('button[type=submit]'); btn.disabled = true;
+    try {
+      const [photo] = f.photo.files.length ? await storeImages(f.photo.files, 'cadeau', $('#perk-status')) : [''];
+      data.cotisation = { ...cotisation(), perks: [...(cotisation().perks || []), { id: uid('cg'), name: f.name.value.trim(), desc: f.desc.value.trim(), photo: photo || '' }] };
+      f.reset(); save();
+    } catch (err) { $('#perk-status').textContent = err.message; }
+    btn.disabled = false;
+  });
+  $('#goodie-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const f = e.target;
+    const btn = f.querySelector('button[type=submit]'); btn.disabled = true;
+    try {
+      const photos = await storeImages(f.photos.files, 'goodie', $('#goodie-status'));
+      if (!Array.isArray(data.goodies)) data.goodies = [];
+      data.goodies.push({ id: uid('g'), name: f.name.value.trim(), desc: f.desc.value.trim(), available: true, photos });
+      f.reset(); save();
+    } catch (err) { $('#goodie-status').textContent = err.message; }
+    btn.disabled = false;
+  });
+  ['#coti-search', '#soutien-search'].forEach((sel) => $(sel).addEventListener('input', renderAdhAdmin));
+  function adhCsv(sheet) {
+    const cols = sheet === 'cotisations'
+      ? [['Prénom', 'firstName'], ['Nom', 'lastName'], ['Chambre', 'room'], ['Preuve', 'proof'], ['Date', 'date'], ['Sac livré', 'done']]
+      : [['Prénom', 'firstName'], ['Nom', 'lastName'], ['Goodies', 'goodies'], ['Date', 'date'], ['Donné', 'done']];
+    const cell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const lines = adh.rows[sheet].map((r) => cols.map(([, k]) => cell(k === 'done' ? (r.done ? 'Oui' : 'Non') : r[k])).join(','));
+    download(`${sheet}.csv`, '﻿' + [cols.map(([h]) => cell(h)).join(','), ...lines].join('\n'), 'text/csv');
+  }
+
   $('#member-form').addEventListener('submit', (e) => {
     e.preventDefault();
     data.members.push({ id: uid('m'), ...formData(e.target), status: 'dispo', updatedAt: new Date().toISOString() });
@@ -1398,7 +1708,10 @@
     const delPhoto = e.target.closest('[data-del-photo]');
     if (delPhoto) {
       e.stopPropagation();
-      const owner = delPhoto.dataset.delPhoto === 'product' ? findIn('products', delPhoto.dataset.id) : (data.partners || []).find((x) => x.id === delPhoto.dataset.id);
+      const kind = delPhoto.dataset.delPhoto;
+      const owner = kind === 'product' ? findIn('products', delPhoto.dataset.id)
+        : kind === 'goodie' ? goodies().find((x) => x.id === delPhoto.dataset.id)
+          : (data.partners || []).find((x) => x.id === delPhoto.dataset.id);
       if (owner && confirm('Retirer cette photo ?')) { owner.photos.splice(Number(delPhoto.dataset.index), 1); save(); }
       return;
     }
@@ -1406,6 +1719,15 @@
       const i = data.products.findIndex((x) => x.id === t.dataset.id); const j = i + Number(t.dataset.move);
       if (i >= 0 && j >= 0 && j < data.products.length) { [data.products[i], data.products[j]] = [data.products[j], data.products[i]]; save(); }
       return;
+    }
+    if (t.dataset.adhRefresh !== undefined) { loadAdhesions(); return; }
+    if (t.dataset.adhCsv) { adhCsv(t.dataset.adhCsv); return; }
+    if (t.dataset.afilter) { adh.filter[t.closest('#coti-filter') ? 'cotisations' : 'soutien'] = t.dataset.afilter; renderAdhAdmin(); return; }
+    if (t.dataset.del === 'goodie' || t.dataset.del === 'perk') {
+      if (!confirm('Supprimer cet élément ?')) return;
+      if (t.dataset.del === 'goodie') data.goodies = goodies().filter((x) => x.id !== t.dataset.id);
+      else data.cotisation = { ...cotisation(), perks: (cotisation().perks || []).filter((x) => x.id !== t.dataset.id) };
+      save(); return;
     }
     if (t.dataset.del === 'partner' || t.dataset.del === 'prize') {
       if (!confirm('Supprimer cet élément ?')) return;
@@ -1458,8 +1780,13 @@
         const id = t.dataset.id;
         const note = $(`#up-${id}`) || $('#contest-admin-status');
         try {
-          const files = await storeImages(t.files, t.dataset.upload.startsWith('partner') ? 'partenaire' : t.dataset.upload === 'product' ? 'commande' : 'lot', note);
-          if (t.dataset.upload === 'product') {
+          const folder = { product: 'commande', prize: 'lot', goodie: 'goodie', perk: 'cadeau' }[t.dataset.upload] || 'partenaire';
+          const files = await storeImages(t.files, folder, note);
+          if (t.dataset.upload === 'goodie') {
+            const g = goodies().find((x) => x.id === id); g.photos = [...(g.photos || []), ...files];
+          } else if (t.dataset.upload === 'perk') {
+            data.cotisation = { ...cotisation(), perks: (cotisation().perks || []).map((x) => (x.id === id ? { ...x, photo: files[0] } : x)) };
+          } else if (t.dataset.upload === 'product') {
             const x = findIn('products', id); x.photos = [...(x.photos || []), ...files];
           } else if (t.dataset.upload === 'prize') {
             data.contest = { ...contest(), prizes: (contest().prizes || []).map((x) => (x.id === id ? { ...x, photo: files[0] } : x)) };
@@ -1471,6 +1798,15 @@
         } catch (err) { if (note) note.textContent = err.message; }
       })();
       return;
+    }
+    if (t.dataset.deliver) { setDelivered(t.dataset.deliver, t.dataset.id, t.checked); return; }
+    if (t.dataset.goodie) {
+      const g = goodies().find((x) => x.id === t.dataset.goodie);
+      g[t.dataset.field] = t.type === 'checkbox' ? t.checked : t.value.trim(); t.blur(); save(); return;
+    }
+    if (t.dataset.perk) {
+      data.cotisation = { ...cotisation(), perks: (cotisation().perks || []).map((x) => (x.id === t.dataset.perk ? { ...x, [t.dataset.field]: t.value.trim() } : x)) };
+      t.blur(); save(); return;
     }
     if (t.dataset.partner) {
       const pa = (data.partners || []).find((x) => x.id === t.dataset.partner);
@@ -1621,6 +1957,7 @@
   setInterval(() => { if (view === 'public' && !document.hidden) renderCountdown(); }, 1000);
   refreshContestCount();
   setInterval(() => { if (!document.hidden) refreshContestCount(); }, 60000);
+  setInterval(() => { if (isAdmin && !document.hidden && (currentTab === 'cotisations' || currentTab === 'soutien')) loadAdhesions(); }, 60000);
 
   renderAll();
   setView(view);

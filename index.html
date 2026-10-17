@@ -658,6 +658,47 @@
     section { padding: 64px 0; }
     .menu { grid-template-columns: 1fr; }
   }
+  /* ---------- Cotisation et soutien actif ---------- */
+  .perk-title { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .2em; color: var(--gold); margin-bottom: 12px; }
+  .perk-desc { display: block; margin-top: 6px; font: 400 14px/1.5 var(--font); color: var(--text-2); text-transform: none; }
+  .name-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .proof-preview img { display: block; width: 100%; max-height: 200px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line-2); margin: -4px 0 14px; }
+  .privacy { font-size: 12px; color: var(--text-3); margin-top: 10px; }
+  .goodies { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
+  .goodie { position: relative; display: flex; flex-direction: column; border-radius: 6px; overflow: hidden; border: 1px solid rgba(255, 255, 255, .16); background: var(--royal); cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+  .goodie input { position: absolute; opacity: 0; pointer-events: none; }
+  .goodie .ph { aspect-ratio: 4 / 3; background: radial-gradient(70% 70% at 50% 40%, #0B47E0, var(--royal-deep)); display: grid; place-items: center; }
+  .goodie .ph img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .goodie .ph svg { width: 48px; height: 48px; color: var(--gold); }
+  .goodie .cap { padding: 14px 16px 16px; display: grid; gap: 4px; }
+  .goodie .cap b { font: 700 15px/1.25 var(--display); text-transform: uppercase; }
+  .goodie .cap small { color: var(--text-2); font-size: 13px; }
+  .goodie .tick { position: absolute; top: 10px; right: 10px; width: 30px; height: 30px; border-radius: 50%; border: 2px solid #fff; background: rgba(0, 20, 92, .65); display: grid; place-items: center; color: transparent; font-weight: 800; }
+  .goodie:hover { border-color: var(--line-2); }
+  .goodie:has(input:checked) { border-color: var(--gold); box-shadow: inset 0 0 0 1px var(--gold); }
+  .goodie:has(input:checked) .tick { background: var(--gold); border-color: var(--gold); color: var(--gold-ink); }
+  .goodie:has(input:focus-visible) { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .goodie.off { opacity: .5; cursor: not-allowed; }
+  .goodie.off .tick { display: none; }
+  .soutien-bar { margin-top: 24px; display: grid; grid-template-columns: 1fr 1fr auto; gap: 12px; align-items: end; padding: 20px; border-radius: 6px; border: 1px solid rgba(245, 220, 74, .45); background: rgba(0, 20, 92, .45); }
+  .soutien-bar .field { margin: 0; }
+  .soutien-done { margin-top: 0; padding: 32px 20px; border-radius: 6px; border: 1px solid rgba(245, 220, 74, .45); background: rgba(0, 20, 92, .45); }
+  .adh-tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 12px; }
+  .adh-tools input[type=search] { max-width: 260px; height: 36px; }
+  .adh-sum { margin-left: auto; font-size: 13px; color: var(--text-3); }
+  .adh-sum b { color: var(--text); }
+  tr.is-done td { color: var(--text-3); }
+  .deliver { display: inline-flex; gap: 8px; align-items: center; cursor: pointer; font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .deliver input { width: 18px; height: 18px; accent-color: var(--ok); }
+  .goodie-sum { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  @media (max-width: 640px) {
+    .soutien-bar, .name-row { grid-template-columns: 1fr; }
+    .goodies { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .goodie .cap { padding: 10px 12px 12px; }
+    .goodie .cap b { font-size: 13px; }
+    .adh-sum { margin-left: 0; width: 100%; }
+  }
+
   @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 </style>
 
@@ -671,6 +712,8 @@
       <li><a href="#programme">Programme</a></li>
       <li><a href="#food">Stands food</a></li>
       <li><a href="#commander">Commander</a></li>
+      <li><a href="#cotisation">Cotisation</a></li>
+      <li><a href="#soutien">Soutien actif</a></li>
       <li><a href="#concours">Jeu concours</a></li>
       <li><a href="#partenaires">Partenaires</a></li>
       <li><a href="#equipe">L'équipe</a></li>
@@ -787,6 +830,63 @@
     </aside>
   </div>
 
+  <section class="alt" id="cotisation">
+    <div class="wrap">
+      <div class="s-head">
+        <div>
+          <p class="kicker">Cotisation</p>
+          <h2>Vous avez cotisé ? Votre cadeau vous attend</h2>
+          <p id="coti-intro"></p>
+        </div>
+      </div>
+      <div class="contest">
+        <div>
+          <h3 class="perk-title">Ce que vous gagnez en payant la cotisation</h3>
+          <div class="prizes" id="coti-perks"></div>
+        </div>
+        <aside class="contest-card">
+          <form id="coti-form" novalidate>
+            <div class="name-row">
+              <label class="field"><span>Prénom</span><input name="firstName" required autocomplete="given-name"></label>
+              <label class="field"><span>Nom de famille</span><input name="lastName" required autocomplete="family-name"></label>
+            </div>
+            <label class="field"><span>Chambre</span><input name="room" required placeholder="Ex. B214"></label>
+            <label class="field"><span>Photo qui prouve le paiement</span><input name="photo" type="file" accept="image/*" required></label>
+            <div class="proof-preview" id="coti-preview"></div>
+            <label class="hp" aria-hidden="true">Ne pas remplir<input name="website" tabindex="-1" autocomplete="off"></label>
+            <button class="btn btn-accent btn-lg contest-submit" type="submit">J'ai cotisé, je veux mon cadeau</button>
+            <p class="note" id="coti-status" role="status"></p>
+            <p class="privacy">Capture du virement, reçu… Votre photo n'est vue que par les membres de la liste.</p>
+          </form>
+          <div class="contest-done" id="coti-done" hidden></div>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <section id="soutien">
+    <div class="wrap">
+      <div class="s-head">
+        <div>
+          <p class="kicker">Soutien actif</p>
+          <h2>Choisissez vos goodies</h2>
+          <p id="soutien-intro"></p>
+        </div>
+      </div>
+      <form id="soutien-form" novalidate>
+        <div class="goodies" id="goodies-grid"></div>
+        <div class="soutien-bar" id="soutien-bar">
+          <label class="field"><span>Prénom</span><input name="firstName" required autocomplete="given-name"></label>
+          <label class="field"><span>Nom de famille</span><input name="lastName" required autocomplete="family-name"></label>
+          <button class="btn btn-accent btn-lg" type="submit">Valider mes goodies</button>
+          <label class="hp" aria-hidden="true">Ne pas remplir<input name="website" tabindex="-1" autocomplete="off"></label>
+        </div>
+        <p class="note" id="soutien-status" role="status"></p>
+      </form>
+      <div class="contest-done soutien-done" id="soutien-done" hidden></div>
+    </div>
+  </section>
+
   <section class="alt" id="concours">
     <div class="wrap">
       <div class="s-head">
@@ -899,6 +999,8 @@
       <button data-tab="members">Où sont les membres</button>
       <button data-tab="budget">Budget</button>
       <button data-tab="shop">Boutique</button>
+      <button data-tab="cotisations">Cotisations</button>
+      <button data-tab="soutien">Soutien actif</button>
       <button data-tab="contest">Jeu concours</button>
       <button data-tab="partners">Partenaires</button>
       <button data-tab="food">Stands food</button>
@@ -1044,6 +1146,83 @@
         <button class="btn" type="submit">Ajouter</button>
         <p class="note" id="product-status"></p>
         <datalist id="product-cats"></datalist>
+      </form>
+    </div>
+
+    <!-- Cotisations -->
+    <div data-panel="cotisations" hidden>
+      <div class="grid grid-2">
+        <form id="coti-admin-form" class="card panel">
+          <h3>Page « Cotisation »</h3>
+          <label class="check-row"><input type="checkbox" name="open"> <span>Déclarations ouvertes</span></label>
+          <label class="field"><span>Texte sous le titre</span><textarea name="intro" rows="3"></textarea></label>
+          <div class="toolbar"><button class="btn" type="submit">Enregistrer</button></div>
+          <p class="note" id="coti-admin-status"></p>
+        </form>
+        <form id="adhesions-form" class="card panel">
+          <h3>Connexion n8n (cotisations et soutien actif)</h3>
+          <label class="field"><span>Webhook (URL de production n8n)</span><input name="webhook" type="url" placeholder="https://….app.n8n.cloud/webhook/leclercq-adhesions"></label>
+          <label class="field"><span>Clé secrète <em>(la même que dans n8n, jamais affichée sur le site)</em></span><input name="key" autocomplete="off" spellcheck="false"></label>
+          <div class="toolbar"><button class="btn" type="submit">Enregistrer</button></div>
+          <p class="note" id="adhesions-status"></p>
+          <p class="faint">Workflow à importer : <code>n8n/adhesions-workflow.json</code> (voir le README).</p>
+        </form>
+      </div>
+      <h3 class="sub-head">Les cotisants</h3>
+      <div class="adh-tools">
+        <input type="search" id="coti-search" placeholder="Rechercher un nom, une chambre…" aria-label="Rechercher">
+        <div class="seg" id="coti-filter"><button type="button" data-afilter="all" class="on">Tous</button><button type="button" data-afilter="todo">Sac à livrer</button><button type="button" data-afilter="done">Livrés</button></div>
+        <button class="btn btn-ghost btn-sm" type="button" data-adh-refresh>Actualiser</button>
+        <button class="btn btn-ghost btn-sm" type="button" data-adh-csv="cotisations">Exporter CSV</button>
+        <span class="adh-sum" id="coti-sum"></span>
+      </div>
+      <div class="table-wrap"><table id="coti-table"></table></div>
+      <h3 class="sub-head">Ce que gagnent les cotisants</h3>
+      <p class="muted" style="margin:-4px 0 14px">Affiché sur le site à côté du formulaire. Chaque champ est enregistré dès que vous quittez la case.</p>
+      <div class="admin-cards" id="perks-admin"></div>
+      <form id="perk-form" class="form-grid card panel" style="margin-top:12px">
+        <label class="field"><span>Cadeau</span><input name="name" required placeholder="Un sac Leclercq des étoiles"></label>
+        <label class="field"><span>Description</span><input name="desc" placeholder="Courte description"></label>
+        <label class="field"><span>Photo</span><input name="photo" type="file" accept="image/*"></label>
+        <button class="btn" type="submit">Ajouter</button>
+        <p class="note" id="perk-status"></p>
+      </form>
+    </div>
+
+    <!-- Soutien actif -->
+    <div data-panel="soutien" hidden>
+      <div class="grid grid-2">
+        <form id="soutien-admin-form" class="card panel">
+          <h3>Page « Soutien actif »</h3>
+          <label class="check-row"><input type="checkbox" name="open"> <span>Demandes ouvertes</span></label>
+          <label class="field"><span>Texte sous le titre</span><textarea name="intro" rows="3"></textarea></label>
+          <div class="toolbar"><button class="btn" type="submit">Enregistrer</button></div>
+          <p class="note" id="soutien-admin-status"></p>
+        </form>
+        <div class="card panel">
+          <h3>Goodies à prévoir</h3>
+          <div class="goodie-sum" id="goodie-sum"></div>
+          <p class="faint">Pour chaque goodie : demandés · déjà donnés. La connexion n8n se règle dans l'onglet Cotisations.</p>
+        </div>
+      </div>
+      <h3 class="sub-head">Les demandes</h3>
+      <div class="adh-tools">
+        <input type="search" id="soutien-search" placeholder="Rechercher un nom, un goodie…" aria-label="Rechercher">
+        <div class="seg" id="soutien-filter"><button type="button" data-afilter="all" class="on">Tous</button><button type="button" data-afilter="todo">À donner</button><button type="button" data-afilter="done">Donnés</button></div>
+        <button class="btn btn-ghost btn-sm" type="button" data-adh-refresh>Actualiser</button>
+        <button class="btn btn-ghost btn-sm" type="button" data-adh-csv="soutien">Exporter CSV</button>
+        <span class="adh-sum" id="soutien-sum"></span>
+      </div>
+      <div class="table-wrap"><table id="soutien-table"></table></div>
+      <h3 class="sub-head">Les goodies proposés</h3>
+      <p class="muted" style="margin:-4px 0 14px">Les gens les cochent sur le site. Décochez « Disponible » pour un goodie épuisé.</p>
+      <div class="admin-cards" id="goodies-admin"></div>
+      <form id="goodie-form" class="form-grid card panel" style="margin-top:12px">
+        <label class="field"><span>Nom du goodie</span><input name="name" required placeholder="Tote bag, stickers, gourde…"></label>
+        <label class="field"><span>Description</span><input name="desc" placeholder="Courte description"></label>
+        <label class="field"><span>Photos</span><input name="photos" type="file" accept="image/*" multiple></label>
+        <button class="btn" type="submit">Ajouter le goodie</button>
+        <p class="note" id="goodie-status"></p>
       </form>
     </div>
 
@@ -1198,6 +1377,8 @@
           <li><a href="#programme">Programme</a></li>
           <li><a href="#food">Stands food</a></li>
           <li><a href="#commander">Commander</a></li>
+          <li><a href="#cotisation">Cotisation</a></li>
+          <li><a href="#soutien">Soutien actif</a></li>
           <li><a href="#equipe">L'équipe</a></li>
         </ul>
       </div>

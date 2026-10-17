@@ -18,6 +18,8 @@ Adresse une fois publiée : https://margauxbouriez-a11y.github.io/junior-entrepr
 - **Où sommes-nous ?** : la position et le statut de chaque membre, avec un bouton pour l'appeler.
 - **Jeu concours** : les lots en photo, le nombre d'inscrits en direct et le formulaire d'inscription.
 - **Partenaires** : une fiche par partenaire (logo, description, photos des produits, lien).
+- **Cotisation** : ce que gagnent les cotisants (un sac, avec sa photo) et un formulaire : prénom, nom, chambre et une photo qui prouve le paiement.
+- **Soutien actif** : les goodies en photo à cocher, puis prénom et nom.
 - Dans le **Programme**, chaque événement peut afficher ses photos (clic pour agrandir) et un lot à gagner.
 - **Inscription e-mail** pour recevoir le programme.
 
@@ -28,6 +30,8 @@ Code d'accès par défaut : `leclercq2026` (modifiable dans Réglages). Il chiff
 - **Où sont les membres** : une carte par membre ; un clic pour changer de statut (Disponible, Occupé·e, En pause, Absent·e), un champ pour la position (avec suggestions des lieux connus), et l'heure de la dernière mise à jour.
 - **Budget** : recettes et dépenses, solde, plafond, dépenses par poste.
 - **Boutique** : catalogue des articles offerts, limite par commande, disponibilité, ouverture ou fermeture de la boutique.
+- **Cotisations** : le tableau de tous les cotisants (prénom, nom, chambre, photo de preuve) avec une case **Sac livré** à cocher, une recherche, un filtre « Sac à livrer » et un export CSV. On y modifie aussi ce que gagnent les cotisants (nom, description, photo) et la connexion n8n.
+- **Soutien actif** : le tableau des demandes (prénom, nom, goodies voulus) avec une case **Donné** à cocher, le total demandé / donné pour chaque goodie, et la gestion des goodies proposés (nom, description, photos, disponible ou épuisé).
 - **Jeu concours** : titre, texte, date de fin, règlement, ouverture des inscriptions, lots avec photo, et nombre d'inscrits en direct.
 - **Partenaires** : ajouter, modifier ou supprimer un partenaire, avec son logo et des photos de ses produits.
 - **Événements** : chaque événement peut recevoir des photos et un lot (nom + photo).
@@ -83,6 +87,26 @@ Les inscriptions sont enregistrées dans un Google Sheet (une ligne par adresse 
 ⚠️ Le Sheet contient les e-mails des participants : partagez-le seulement avec les membres de la liste (jamais « Tous les utilisateurs disposant du lien »). Son adresse est visible dans `data.js`, mais elle ne donne aucun accès sans ce partage.
 
 Le compteur utilise automatiquement la deuxième adresse du workflow (`…/leclercq-concours-compteur`), rien à régler. Pour le tirage au sort, ouvrez le Sheet et choisissez une ligne au hasard (par exemple `=INDEX(C2:C; ALEA.ENTRE.BORNES(1; NBVAL(C2:C)))`).
+
+## Cotisation et soutien actif via n8n + Google Sheet + Google Drive
+Les déclarations du site partent vers un webhook n8n qui :
+- **Cotisation** : range la photo de preuve dans un dossier Google Drive, puis ajoute une ligne dans l'onglet `Cotisations` (Date, ID, Prénom, Nom, Chambre, Preuve = lien de la photo, Livré = Non) ;
+- **Soutien actif** : ajoute une ligne dans l'onglet `Soutien` (Date, ID, Prénom, Nom, Goodies, Donné = Non).
+
+L'Espace liste lit ces deux onglets et coche « Livré » / « Donné » via une deuxième adresse (`…/leclercq-adhesions-admin`), protégée par une **clé secrète**. Cette clé est enregistrée dans la partie chiffrée de `data.js` : seuls les membres qui ont le code d'accès l'ont.
+
+**À faire une fois :**
+1. Dans le Google Sheet de la liste, ajoutez deux onglets `Cotisations` et `Soutien`, et importez-y `n8n/modele-cotisations.csv` et `n8n/modele-soutien.csv` (« Remplacer la feuille actuelle »).
+2. Dans Google Drive, créez un dossier « Preuves cotisation », partagé seulement avec les membres de la liste.
+3. Dans n8n, importez `n8n/adhesions-workflow.json`, puis :
+   - dans les nœuds Google Sheets, choisissez votre compte Google et collez l'adresse du Sheet ;
+   - dans **Ranger la photo dans Drive**, choisissez votre compte Google Drive (Credential « Google Drive OAuth2 ») et collez l'adresse du dossier ;
+   - dans **Vérifier la clé**, remplacez `CHANGEZ-MOI` par une clé longue (16 caractères minimum), par exemple `leclercq-7Hq2-pX9w-Lm4z`.
+4. **Save**, puis **Publish**. Copiez la **Production URL** du nœud « Déclaration reçue » (elle finit par `/webhook/leclercq-adhesions`).
+5. Sur le site : **Espace liste → Cotisations → Connexion n8n**, collez l'URL et la clé, puis **Enregistrer**. Les tableaux se remplissent et s'actualisent chaque minute.
+6. Ajoutez les goodies (nom + photos) dans **Espace liste → Soutien actif**.
+
+Tant que le webhook n'est pas réglé, les deux sections affichent « Bientôt ouvert ». Les cases cochées sur le site sont aussi modifiables directement dans le Sheet (Oui / Non).
 
 ## Inscriptions e-mail
 Pour recevoir les inscriptions des étudiants de tous les appareils, renseignez dans **Réglages** l'URL d'un webhook (n8n, Zapier, Google Apps Script…). La plateforme y envoie `{ email, name, date, list }` en JSON.
