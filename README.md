@@ -30,7 +30,7 @@ Code d'accès par défaut : `leclercq2026` (modifiable dans Réglages). Il chiff
 - **Où sont les membres** : une carte par membre ; un clic pour changer de statut (Disponible, Occupé·e, En pause, Absent·e), un champ pour la position (avec suggestions des lieux connus), et l'heure de la dernière mise à jour.
 - **Budget** : recettes et dépenses, solde, plafond, dépenses par poste.
 - **Boutique** : catalogue des articles offerts, limite par commande, disponibilité, ouverture ou fermeture de la boutique.
-- **Cotisations** : le tableau de tous les cotisants (prénom, nom, chambre, photo de preuve) avec une case **Sac livré** à cocher, une recherche, un filtre « Sac à livrer » et un export CSV. On y modifie aussi ce que gagnent les cotisants (nom, description, photo) et la connexion n8n.
+- **Cotisations** : le tableau de tous les cotisants (prénom, nom, chambre, photo de preuve à ouvrir en grand) avec une case **Sac livré** à cocher, une recherche, un filtre « Sac à livrer » et un export CSV. On y modifie aussi ce que gagnent les cotisants (nom, description, photo) et la connexion n8n.
 - **Soutien actif** : le tableau des demandes (prénom, nom, goodies voulus) avec une case **Donné** à cocher, le total demandé / donné pour chaque goodie, et la gestion des goodies proposés (nom, description, photos, disponible ou épuisé).
 - **Jeu concours** : titre, texte, date de fin, règlement, ouverture des inscriptions, lots avec photo, et nombre d'inscrits en direct.
 - **Partenaires** : ajouter, modifier ou supprimer un partenaire, avec son logo et des photos de ses produits.
@@ -88,25 +88,22 @@ Les inscriptions sont enregistrées dans un Google Sheet (une ligne par adresse 
 
 Le compteur utilise automatiquement la deuxième adresse du workflow (`…/leclercq-concours-compteur`), rien à régler. Pour le tirage au sort, ouvrez le Sheet et choisissez une ligne au hasard (par exemple `=INDEX(C2:C; ALEA.ENTRE.BORNES(1; NBVAL(C2:C)))`).
 
-## Cotisation et soutien actif via n8n + Google Sheet + Google Drive
-Les déclarations du site partent vers un webhook n8n qui :
-- **Cotisation** : range la photo de preuve dans un dossier Google Drive, puis ajoute une ligne dans l'onglet `Cotisations` (Date, ID, Prénom, Nom, Chambre, Preuve = lien de la photo, Livré = Non) ;
-- **Soutien actif** : ajoute une ligne dans l'onglet `Soutien` (Date, ID, Prénom, Nom, Goodies, Donné = Non).
+## Cotisation et soutien actif via n8n (sans Google Sheet)
+Les déclarations du site partent vers un webhook n8n qui **garde la liste lui-même** (dans la mémoire du workflow) : pas de Google Sheet ni de dossier Drive. Tout se consulte dans l'Espace liste :
+- **Cotisations** : prénom, nom, chambre, bouton « Voir la photo » (la preuve s'ouvre en grand), date, case **Sac livré**, bouton pour supprimer une ligne (doublon, erreur).
+- **Soutien actif** : prénom, nom, goodies voulus, date, case **Donné**, et le total par goodie.
 
-L'Espace liste lit ces deux onglets et coche « Livré » / « Donné » via une deuxième adresse (`…/leclercq-adhesions-admin`), protégée par une **clé secrète**. Cette clé est enregistrée dans la partie chiffrée de `data.js` : seuls les membres qui ont le code d'accès l'ont.
+Les tableaux sont lus via une deuxième adresse (`…/leclercq-adhesions-admin`) protégée par une **clé secrète**. Cette clé est enregistrée dans la partie chiffrée de `data.js` : seuls les membres qui ont le code d'accès l'ont. Les photos ne sont jamais publiées sur le site.
 
 **À faire une fois :**
-1. Dans le Google Sheet de la liste, ajoutez deux onglets `Cotisations` et `Soutien`, et importez-y `n8n/modele-cotisations.csv` et `n8n/modele-soutien.csv` (« Remplacer la feuille actuelle »).
-2. Dans Google Drive, créez un dossier « Preuves cotisation », partagé seulement avec les membres de la liste.
-3. Dans n8n, importez `n8n/adhesions-workflow.json`, puis :
-   - dans les nœuds Google Sheets, choisissez votre compte Google et collez l'adresse du Sheet ;
-   - dans **Ranger la photo dans Drive**, choisissez votre compte Google Drive (Credential « Google Drive OAuth2 ») et collez l'adresse du dossier ;
-   - dans **Vérifier la clé**, remplacez `CHANGEZ-MOI` par une clé longue (16 caractères minimum), par exemple `leclercq-7Hq2-pX9w-Lm4z`.
-4. **Save**, puis **Publish**. Copiez la **Production URL** du nœud « Déclaration reçue » (elle finit par `/webhook/leclercq-adhesions`).
-5. Sur le site : **Espace liste → Cotisations → Connexion n8n**, collez l'URL et la clé, puis **Enregistrer**. Les tableaux se remplissent et s'actualisent chaque minute.
-6. Ajoutez les goodies (nom + photos) dans **Espace liste → Soutien actif**.
+1. Dans n8n : **Create workflow → ⋯ → Import from File**, puis choisissez `n8n/adhesions-workflow.json`.
+2. Ouvrez le nœud **Vérifier la clé et répondre** et remplacez `CHANGEZ-MOI` par une clé longue (16 caractères minimum), par exemple `leclercq-7Hq2-pX9w-Lm4z`.
+3. **Save**, puis **Publish**. Copiez la **Production URL** du nœud « Déclaration reçue » (elle finit par `/webhook/leclercq-adhesions`).
+4. Sur le site : **Espace liste → Cotisations → Connexion n8n**, collez l'URL et la clé, puis **Enregistrer**. Les tableaux s'actualisent chaque minute.
+5. Ajoutez les goodies (nom + photos) dans **Espace liste → Soutien actif**.
 
-Tant que le webhook n'est pas réglé, les deux sections affichent « Bientôt ouvert ». Les cases cochées sur le site sont aussi modifiables directement dans le Sheet (Oui / Non).
+Tant que le webhook n'est pas réglé, les deux sections affichent « Bientôt ouvert ».
+⚠️ La liste vit dans le workflow : ne le supprimez pas et ne le réimportez pas par-dessus (vous repartiriez de zéro). Les essais avec « Test workflow » ne sont pas enregistrés, seuls les envois du site publié comptent. Pensez à faire **Exporter CSV** de temps en temps pour garder une copie.
 
 ## Inscriptions e-mail
 Pour recevoir les inscriptions des étudiants de tous les appareils, renseignez dans **Réglages** l'URL d'un webhook (n8n, Zapier, Google Apps Script…). La plateforme y envoie `{ email, name, date, list }` en JSON.

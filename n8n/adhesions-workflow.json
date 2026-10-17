@@ -10,7 +10,7 @@
           "allowedOrigins": "*"
         }
       },
-      "id": "8b03a51a-d09a-4460-ad12-2bbfbe3a3105",
+      "id": "e46f739e-501b-4aa5-821b-c098d2af14d2",
       "name": "Déclaration reçue",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
@@ -18,302 +18,33 @@
         0,
         0
       ],
-      "webhookId": "6b616c97-8c36-4f1e-a847-89e6a71b2bc5"
+      "webhookId": "bf6e0d68-facb-449c-8665-d1e3e0a3350b"
     },
     {
       "parameters": {
-        "jsCode": "// Vérifie la déclaration envoyée par le site (cotisation ou soutien actif)\nconst b = $input.first().json.body || {};\nif (b.website) throw new Error('Envoi ignoré (anti-spam)');\nconst clean = (v, max = 120) => String(v ?? '').replace(/\\s+/g, ' ').trim().slice(0, max);\nconst date = new Date().toLocaleString('fr-FR', { timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });\nconst d = {\n  type: clean(b.type, 20),\n  id: clean(b.id, 20) || ('X-' + Date.now().toString(36).toUpperCase()),\n  firstName: clean(b.firstName, 60),\n  lastName: clean(b.lastName, 60),\n  date,\n};\nif (!d.firstName || !d.lastName) throw new Error('Prénom ou nom manquant');\n\nif (d.type === 'cotisation') {\n  d.room = clean(b.room, 40);\n  const photo = String(b.photo || '');\n  const m = photo.match(/^data:image\\/(jpeg|jpg|png|webp);base64,([A-Za-z0-9+/=\\s]+)$/);\n  if (!d.room || !m) throw new Error('Chambre ou photo manquante');\n  if (m[2].length > 6000000) throw new Error('Photo trop lourde');\n  d.photo = m[2].replace(/\\s/g, '');\n  d.fileName = `${d.lastName}-${d.firstName}-${d.room}-${d.id}.jpg`.replace(/[^\\p{L}\\p{N}.\\-]+/gu, '_');\n  d.route = 0;\n} else if (d.type === 'soutien') {\n  d.goodies = clean(b.goodies, 500);\n  if (!d.goodies) throw new Error('Aucun goodie choisi');\n  d.route = 1;\n} else {\n  throw new Error('Type inconnu');\n}\nreturn [{ json: d }];\n"
+        "jsCode": "// Enregistre la déclaration dans la mémoire du workflow (pas de Google Sheet).\n// La liste se consulte dans l'Espace liste du site (onglets Cotisations et Soutien actif).\nconst store = $getWorkflowStaticData('global');\nstore.cotisations = store.cotisations || [];\nstore.soutien = store.soutien || [];\nstore.photos = store.photos || {};\n\nconst b = $input.first().json.body || {};\nif (b.website) return [{ json: { ok: true } }]; // robot : on ignore sans rien enregistrer\nconst clean = (v, max = 120) => String(v ?? '').replace(/\\s+/g, ' ').trim().slice(0, max);\nconst date = new Date().toLocaleString('fr-FR', { timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });\nconst row = {\n  id: clean(b.id, 20) || ('X-' + Date.now().toString(36).toUpperCase()),\n  date,\n  firstName: clean(b.firstName, 60),\n  lastName: clean(b.lastName, 60),\n  done: false,\n};\nif (!row.firstName || !row.lastName) return [{ json: { ok: false, error: 'incomplet' } }];\n\nif (b.type === 'cotisation') {\n  row.room = clean(b.room, 40);\n  const photo = String(b.photo || '').replace(/\\s/g, '');\n  if (!row.room || !/^data:image\\/(jpeg|jpg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(photo)) return [{ json: { ok: false, error: 'incomplet' } }];\n  if (photo.length > 1500000) return [{ json: { ok: false, error: 'photo' } }];\n  if (store.cotisations.length >= 3000) return [{ json: { ok: false, error: 'plein' } }];\n  store.photos[row.id] = photo;\n  store.cotisations.push(row);\n} else if (b.type === 'soutien') {\n  row.goodies = clean(b.goodies, 500);\n  if (!row.goodies) return [{ json: { ok: false, error: 'incomplet' } }];\n  if (store.soutien.length >= 3000) return [{ json: { ok: false, error: 'plein' } }];\n  store.soutien.push(row);\n} else {\n  return [{ json: { ok: false, error: 'type' } }];\n}\nreturn [{ json: { ok: true, id: row.id } }];\n"
       },
-      "id": "9911d116-b824-48d4-9b8b-85acd946f42d",
-      "name": "Préparer la déclaration",
+      "id": "09885c31-e058-416e-ac8e-f851dd9b9146",
+      "name": "Enregistrer dans la liste",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        220,
+        240,
         0
       ]
     },
     {
       "parameters": {
-        "mode": "expression",
-        "numberOutputs": 2,
-        "output": "={{ $json.route }}",
+        "respondWith": "firstIncomingItem",
         "options": {}
       },
-      "id": "a7fa07c2-e16e-40a6-a941-d46c0137b774",
-      "name": "Cotisation ou soutien ?",
-      "type": "n8n-nodes-base.switch",
-      "typeVersion": 3,
+      "id": "6296de2a-b365-4ddc-bacf-99fb418e1ff8",
+      "name": "Répondre au site",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
       "position": [
-        440,
+        480,
         0
-      ]
-    },
-    {
-      "parameters": {
-        "operation": "toBinary",
-        "sourceProperty": "photo",
-        "options": {
-          "fileName": "={{ $json.fileName }}",
-          "mimeType": "image/jpeg"
-        }
-      },
-      "id": "f3dc5475-ac88-4b50-a137-8f9f59971f7d",
-      "name": "Photo en fichier",
-      "type": "n8n-nodes-base.convertToFile",
-      "typeVersion": 1.1,
-      "position": [
-        660,
-        -120
-      ]
-    },
-    {
-      "parameters": {
-        "name": "={{ $('Préparer la déclaration').item.json.fileName }}",
-        "driveId": {
-          "__rl": true,
-          "value": "My Drive",
-          "mode": "list",
-          "cachedResultName": "My Drive"
-        },
-        "folderId": {
-          "__rl": true,
-          "value": "COLLEZ-ICI-L-URL-DU-DOSSIER-DRIVE",
-          "mode": "url"
-        },
-        "options": {}
-      },
-      "id": "2110c21f-fecc-42f4-80d7-fc1c2437c516",
-      "name": "Ranger la photo dans Drive",
-      "type": "n8n-nodes-base.googleDrive",
-      "typeVersion": 3,
-      "position": [
-        880,
-        -120
-      ]
-    },
-    {
-      "parameters": {
-        "operation": "append",
-        "documentId": {
-          "__rl": true,
-          "value": "COLLEZ-ICI-L-URL-DU-GOOGLE-SHEET",
-          "mode": "url"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": "Cotisations",
-          "mode": "name"
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "Date": "={{ $('Préparer la déclaration').item.json.date }}",
-            "ID": "={{ $('Préparer la déclaration').item.json.id }}",
-            "Prénom": "={{ $('Préparer la déclaration').item.json.firstName }}",
-            "Nom": "={{ $('Préparer la déclaration').item.json.lastName }}",
-            "Chambre": "={{ $('Préparer la déclaration').item.json.room }}",
-            "Preuve": "=https://drive.google.com/file/d/{{ $json.id }}/view",
-            "Livré": "Non"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "Date",
-              "displayName": "Date",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "ID",
-              "displayName": "ID",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "Prénom",
-              "displayName": "Prénom",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "Nom",
-              "displayName": "Nom",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "Chambre",
-              "displayName": "Chambre",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "Preuve",
-              "displayName": "Preuve",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "Livré",
-              "displayName": "Livré",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            }
-          ]
-        },
-        "options": {}
-      },
-      "id": "679766e6-ea84-488f-ba8e-49f2da1c42c2",
-      "name": "Ajouter le cotisant",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.5,
-      "position": [
-        1100,
-        -120
-      ]
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={ \"ok\": true }",
-        "options": {}
-      },
-      "id": "66aa7db1-7174-475d-a752-88b94a37742d",
-      "name": "Répondre (cotisation)",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.1,
-      "position": [
-        1320,
-        -120
-      ]
-    },
-    {
-      "parameters": {
-        "operation": "append",
-        "documentId": {
-          "__rl": true,
-          "value": "COLLEZ-ICI-L-URL-DU-GOOGLE-SHEET",
-          "mode": "url"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": "Soutien",
-          "mode": "name"
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "Date": "={{ $json.date }}",
-            "ID": "={{ $json.id }}",
-            "Prénom": "={{ $json.firstName }}",
-            "Nom": "={{ $json.lastName }}",
-            "Goodies": "={{ $json.goodies }}",
-            "Donné": "Non"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "Date",
-              "displayName": "Date",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "ID",
-              "displayName": "ID",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "Prénom",
-              "displayName": "Prénom",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "Nom",
-              "displayName": "Nom",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "Goodies",
-              "displayName": "Goodies",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "Donné",
-              "displayName": "Donné",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            }
-          ]
-        },
-        "options": {}
-      },
-      "id": "a987d5d6-9e74-49cf-8733-6f73dc0f478e",
-      "name": "Ajouter la demande",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.5,
-      "position": [
-        660,
-        120
-      ]
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={ \"ok\": true }",
-        "options": {}
-      },
-      "id": "884bbb49-efde-42aa-bbad-f39325b5e33d",
-      "name": "Répondre (soutien)",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.1,
-      "position": [
-        880,
-        120
       ]
     },
     {
@@ -325,122 +56,27 @@
           "allowedOrigins": "*"
         }
       },
-      "id": "813ccfe9-5815-4007-8e3c-e8884a121e6b",
+      "id": "abbd5ee2-6385-46db-9169-c8184e451287",
       "name": "Demande de l'Espace liste",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [
         0,
-        420
+        240
       ],
-      "webhookId": "85b7af8a-fdab-48fd-887b-96886b3e67df"
+      "webhookId": "6cf94e22-6c67-4b06-9474-98b19e7a7803"
     },
     {
       "parameters": {
-        "jsCode": "// Accès de l'Espace liste : la clé doit être la même que dans le site (onglet Cotisations)\n// ⚠️ Remplacez CHANGEZ-MOI par une clé longue et secrète (au moins 16 caractères).\nconst CLE_SECRETE = 'CHANGEZ-MOI';\n\nconst b = $input.first().json.body || {};\nconst ok = CLE_SECRETE !== 'CHANGEZ-MOI' && CLE_SECRETE.length >= 16 && String(b.key || '') === CLE_SECRETE;\nif (!ok) return [{ json: { route: 0 } }];\nconst action = String(b.action || 'list');\nif (action === 'set') {\n  const value = b.value === 'Oui' ? 'Oui' : 'Non';\n  const id = String(b.id || '').slice(0, 20);\n  if (!id) return [{ json: { route: 0 } }];\n  if (b.sheet === 'cotisations') return [{ json: { route: 2, id, value } }];\n  if (b.sheet === 'soutien') return [{ json: { route: 3, id, value } }];\n  return [{ json: { route: 0 } }];\n}\nreturn [{ json: { route: 1 } }];\n"
+        "jsCode": "// Espace liste : lire la liste, cocher « livré / donné », voir une photo, supprimer une ligne.\n// ⚠️ Remplacez CHANGEZ-MOI par une clé longue et secrète (au moins 16 caractères),\n// puis collez la même clé dans le site : Espace liste → Cotisations → Connexion n8n.\nconst CLE_SECRETE = 'CHANGEZ-MOI';\n\nconst b = $input.first().json.body || {};\nconst okKey = CLE_SECRETE !== 'CHANGEZ-MOI' && CLE_SECRETE.length >= 16 && String(b.key || '') === CLE_SECRETE;\nif (!okKey) return [{ json: { ok: false, error: 'cle' } }];\n\nconst store = $getWorkflowStaticData('global');\nstore.cotisations = store.cotisations || [];\nstore.soutien = store.soutien || [];\nstore.photos = store.photos || {};\nconst list = b.sheet === 'soutien' ? store.soutien : store.cotisations;\nconst id = String(b.id || '');\n\nswitch (String(b.action || 'list')) {\n  case 'set': {\n    const row = list.find((r) => r.id === id);\n    if (!row) return [{ json: { ok: false, error: 'introuvable' } }];\n    row.done = b.value === 'Oui';\n    return [{ json: { ok: true } }];\n  }\n  case 'delete': {\n    const i = list.findIndex((r) => r.id === id);\n    if (i < 0) return [{ json: { ok: false, error: 'introuvable' } }];\n    list.splice(i, 1);\n    delete store.photos[id];\n    return [{ json: { ok: true } }];\n  }\n  case 'photo':\n    return [{ json: { ok: true, photo: store.photos[id] || '' } }];\n  default:\n    return [{ json: {\n      ok: true,\n      cotisations: store.cotisations.map((r) => ({ ...r, hasPhoto: !!store.photos[r.id] })),\n      soutien: store.soutien,\n    } }];\n}\n"
       },
-      "id": "e2c358dc-399d-4744-ba7a-40a2614096d9",
-      "name": "Vérifier la clé",
+      "id": "5e2ed682-d9fc-442c-b796-272a9e00a38d",
+      "name": "Vérifier la clé et répondre",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        220,
-        420
-      ]
-    },
-    {
-      "parameters": {
-        "mode": "expression",
-        "numberOutputs": 4,
-        "output": "={{ $json.route }}",
-        "options": {}
-      },
-      "id": "04885113-544f-484b-b66e-ca8d899be067",
-      "name": "Que faire ?",
-      "type": "n8n-nodes-base.switch",
-      "typeVersion": 3,
-      "position": [
-        440,
-        420
-      ]
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={ \"ok\": false, \"error\": \"cle\" }",
-        "options": {}
-      },
-      "id": "32b3819d-b372-409d-be95-78e7b37181a3",
-      "name": "Refuser",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.1,
-      "position": [
-        660,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "operation": "read",
-        "documentId": {
-          "__rl": true,
-          "value": "COLLEZ-ICI-L-URL-DU-GOOGLE-SHEET",
-          "mode": "url"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": "Cotisations",
-          "mode": "name"
-        },
-        "options": {}
-      },
-      "id": "2ae24c3d-5609-4065-b1c3-b024fba2d113",
-      "name": "Lire les cotisations",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.5,
-      "position": [
-        660,
-        420
-      ],
-      "alwaysOutputData": true
-    },
-    {
-      "parameters": {
-        "operation": "read",
-        "documentId": {
-          "__rl": true,
-          "value": "COLLEZ-ICI-L-URL-DU-GOOGLE-SHEET",
-          "mode": "url"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": "Soutien",
-          "mode": "name"
-        },
-        "options": {}
-      },
-      "id": "d531a4ed-0d20-4f5e-90cc-7ab60be7afb0",
-      "name": "Lire le soutien",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.5,
-      "position": [
-        880,
-        420
-      ],
-      "alwaysOutputData": true,
-      "executeOnce": true
-    },
-    {
-      "parameters": {
-        "jsCode": "// Met en forme les deux onglets pour l'Espace liste\nconst rows = (items) => items.map((i) => i.json || {}).filter((r) => String(r['ID'] || '').trim());\nconst cotisations = rows($('Lire les cotisations').all()).map((r) => ({\n  id: String(r['ID']), date: r['Date'] || '', firstName: r['Prénom'] || '', lastName: r['Nom'] || '',\n  room: r['Chambre'] || '', proof: r['Preuve'] || '', done: String(r['Livré'] || '').trim().toLowerCase() === 'oui',\n}));\nconst soutien = rows($input.all()).map((r) => ({\n  id: String(r['ID']), date: r['Date'] || '', firstName: r['Prénom'] || '', lastName: r['Nom'] || '',\n  goodies: r['Goodies'] || '', done: String(r['Donné'] || '').trim().toLowerCase() === 'oui',\n}));\nreturn [{ json: { ok: true, cotisations, soutien } }];\n"
-      },
-      "id": "1ed5d0ab-348c-4b42-b2a8-04588a4ac4f8",
-      "name": "Assembler",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1100,
-        420
+        240,
+        240
       ]
     },
     {
@@ -448,154 +84,14 @@
         "respondWith": "firstIncomingItem",
         "options": {}
       },
-      "id": "c03c0f57-ae7c-4eb0-a251-ee2a6bd18812",
-      "name": "Envoyer les listes",
+      "id": "084c02e2-ce20-4ceb-93d2-4fc1df2a3b58",
+      "name": "Envoyer la réponse",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        1320,
-        420
+        480,
+        240
       ]
-    },
-    {
-      "parameters": {
-        "operation": "update",
-        "documentId": {
-          "__rl": true,
-          "value": "COLLEZ-ICI-L-URL-DU-GOOGLE-SHEET",
-          "mode": "url"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": "Cotisations",
-          "mode": "name"
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "ID": "={{ $json.id }}",
-            "Livré": "={{ $json.value }}"
-          },
-          "matchingColumns": [
-            "ID"
-          ],
-          "schema": [
-            {
-              "id": "ID",
-              "displayName": "ID",
-              "required": false,
-              "defaultMatch": true,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "Livré",
-              "displayName": "Livré",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            }
-          ]
-        },
-        "options": {}
-      },
-      "id": "4ec9bb14-20eb-46ad-8917-09a28e5e5dd7",
-      "name": "Cocher la cotisation",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.5,
-      "position": [
-        660,
-        560
-      ]
-    },
-    {
-      "parameters": {
-        "operation": "update",
-        "documentId": {
-          "__rl": true,
-          "value": "COLLEZ-ICI-L-URL-DU-GOOGLE-SHEET",
-          "mode": "url"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": "Soutien",
-          "mode": "name"
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "ID": "={{ $json.id }}",
-            "Donné": "={{ $json.value }}"
-          },
-          "matchingColumns": [
-            "ID"
-          ],
-          "schema": [
-            {
-              "id": "ID",
-              "displayName": "ID",
-              "required": false,
-              "defaultMatch": true,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "Donné",
-              "displayName": "Donné",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            }
-          ]
-        },
-        "options": {}
-      },
-      "id": "63f4cf29-520a-4ae1-ab4e-44597d274e41",
-      "name": "Cocher le soutien",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.5,
-      "position": [
-        660,
-        700
-      ]
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={ \"ok\": true }",
-        "options": {}
-      },
-      "id": "1fdbb2e6-7111-4845-ac56-6d193fc9de20",
-      "name": "Confirmer (cotisation)",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.1,
-      "position": [
-        880,
-        560
-      ],
-      "executeOnce": true
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={ \"ok\": true }",
-        "options": {}
-      },
-      "id": "a1228300-dfbe-4706-84c2-6e883d53c658",
-      "name": "Confirmer (soutien)",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.1,
-      "position": [
-        880,
-        700
-      ],
-      "executeOnce": true
     }
   ],
   "connections": {
@@ -603,80 +99,18 @@
       "main": [
         [
           {
-            "node": "Préparer la déclaration",
+            "node": "Enregistrer dans la liste",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Préparer la déclaration": {
+    "Enregistrer dans la liste": {
       "main": [
         [
           {
-            "node": "Cotisation ou soutien ?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Cotisation ou soutien ?": {
-      "main": [
-        [
-          {
-            "node": "Photo en fichier",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Ajouter la demande",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Photo en fichier": {
-      "main": [
-        [
-          {
-            "node": "Ranger la photo dans Drive",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Ranger la photo dans Drive": {
-      "main": [
-        [
-          {
-            "node": "Ajouter le cotisant",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Ajouter le cotisant": {
-      "main": [
-        [
-          {
-            "node": "Répondre (cotisation)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Ajouter la demande": {
-      "main": [
-        [
-          {
-            "node": "Répondre (soutien)",
+            "node": "Répondre au site",
             "type": "main",
             "index": 0
           }
@@ -687,105 +121,18 @@
       "main": [
         [
           {
-            "node": "Vérifier la clé",
+            "node": "Vérifier la clé et répondre",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Vérifier la clé": {
+    "Vérifier la clé et répondre": {
       "main": [
         [
           {
-            "node": "Que faire ?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Que faire ?": {
-      "main": [
-        [
-          {
-            "node": "Refuser",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Lire les cotisations",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Cocher la cotisation",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Cocher le soutien",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Lire les cotisations": {
-      "main": [
-        [
-          {
-            "node": "Lire le soutien",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Lire le soutien": {
-      "main": [
-        [
-          {
-            "node": "Assembler",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Assembler": {
-      "main": [
-        [
-          {
-            "node": "Envoyer les listes",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Cocher la cotisation": {
-      "main": [
-        [
-          {
-            "node": "Confirmer (cotisation)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Cocher le soutien": {
-      "main": [
-        [
-          {
-            "node": "Confirmer (soutien)",
+            "node": "Envoyer la réponse",
             "type": "main",
             "index": 0
           }

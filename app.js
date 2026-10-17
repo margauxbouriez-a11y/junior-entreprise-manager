@@ -766,9 +766,9 @@
     } finally { btn.disabled = false; }
   });
 
-  // ---------- Cotisation et soutien actif (via n8n + Google Sheet) ----------
-  // Les déclarations partent vers le webhook n8n « adhesions » ; l'Espace liste
-  // lit et coche les lignes via la même adresse suivie de « -admin », avec la clé secrète.
+  // ---------- Cotisation et soutien actif (via n8n, qui garde la liste) ----------
+  // Les déclarations partent vers le webhook n8n « adhesions », qui garde la liste lui-même.
+  // L'Espace liste la lit et la coche via la même adresse suivie de « -admin », avec la clé secrète.
   const cotisation = () => data.cotisation || {};
   const soutienCfg = () => data.soutien || {};
   const goodies = () => (Array.isArray(data.goodies) ? data.goodies : []);
@@ -805,7 +805,7 @@
     const file = e.target.files[0];
     if (!file) return;
     try {
-      cotiPhoto = await resizeImage(file, 1200, 0.72);
+      cotiPhoto = await resizeImage(file, 900, 0.62);
       $('#coti-preview').innerHTML = `<img src="${cotiPhoto}" alt="Aperçu de la photo">`;
       $('#coti-status').textContent = '';
     } catch (err) {
@@ -1335,7 +1335,7 @@
       </div>`).join('') || '<p class="faint">Aucun lot pour le moment.</p>';
   }
 
-  // Cotisations et soutien actif (Espace liste) : tableaux lus dans le Google Sheet via n8n
+  // Cotisations et soutien actif (Espace liste) : tableaux lus dans n8n
   const adh = { loading: false, error: '', at: null, rows: { cotisations: [], soutien: [] }, filter: { cotisations: 'all', soutien: 'all' } };
   async function adhRequest(payload) {
     if (!adhAdminUrl()) throw new Error("Réglez d'abord le webhook n8n (onglet Cotisations).");
@@ -1365,6 +1365,25 @@
     try { await adhRequest({ action: 'set', sheet, id: row.id, value: value ? 'Oui' : 'Non' }); }
     catch (err) { row.done = before; adh.error = err.message; renderAdhAdmin(); }
   }
+  const delBtnAdh = (sheet, id) => `<button class="btn btn-danger btn-sm" type="button" data-adh-del="${sheet}" data-id="${esc(id)}">Suppr.</button>`;
+  async function showProof(id, caption) {
+    try {
+      const res = await adhRequest({ action: 'photo', id });
+      if (!res.photo) throw new Error('Photo introuvable.');
+      gallery = { list: [res.photo], i: 0, caption };
+      showGallery();
+      const box = $('#lightbox');
+      if (box.showModal) box.showModal(); else box.setAttribute('open', '');
+    } catch (err) { adh.error = err.message; renderAdhAdmin(); }
+  }
+  async function deleteAdh(sheet, id) {
+    const row = adh.rows[sheet].find((r) => String(r.id) === String(id));
+    if (!row || !confirm(`Supprimer ${fullName(row)} de la liste ?`)) return;
+    try {
+      await adhRequest({ action: 'delete', sheet, id: row.id });
+      adh.rows[sheet] = adh.rows[sheet].filter((r) => r !== row); renderAdhAdmin();
+    } catch (err) { adh.error = err.message; renderAdhAdmin(); }
+  }
   const fullName = (r) => `${r.firstName || ''} ${r.lastName || ''}`.trim();
   const matches = (r, q, extra) => !q || [fullName(r), r.lastName, r.firstName, extra].join(' ').toLowerCase().includes(q);
   function adhRowsFor(sheet) {
@@ -1391,22 +1410,24 @@
   function renderAdhAdmin() {
     if (!isAdmin) return;
     const cRows = adhRowsFor('cotisations');
-    $('#coti-table').innerHTML = `<thead><tr><th>Prénom</th><th>Nom</th><th>Chambre</th><th>Preuve</th><th>Date</th><th>Sac livré</th></tr></thead><tbody>${cRows.length ? cRows.map((r) => `
+    $('#coti-table').innerHTML = `<thead><tr><th>Prénom</th><th>Nom</th><th>Chambre</th><th>Preuve</th><th>Date</th><th>Sac livré</th><th></th></tr></thead><tbody>${cRows.length ? cRows.map((r) => `
       <tr class="${r.done ? 'is-done' : ''}">
         <td>${esc(r.firstName)}</td><td><b>${esc(r.lastName)}</b></td><td>${esc(r.room)}</td>
-        <td>${r.proof ? `<a href="${esc(r.proof)}" target="_blank" rel="noopener">Voir la photo</a>` : '<span class="faint">—</span>'}</td>
+        <td>${r.hasPhoto ? `<button class="link-btn" type="button" data-proof="${esc(r.id)}" data-caption="${esc(`${fullName(r)} · chambre ${r.room}`)}">Voir la photo</button>` : '<span class="faint">—</span>'}</td>
         <td class="faint">${esc(r.date)}</td>
         <td><label class="deliver"><input type="checkbox" data-deliver="cotisations" data-id="${esc(r.id)}" ${r.done ? 'checked' : ''}> ${r.done ? 'Livré' : 'À livrer'}</label></td>
-      </tr>`).join('') : adhEmpty('cotisations', 6)}</tbody>`;
+        <td class="num">${delBtnAdh('cotisations', r.id)}</td>
+      </tr>`).join('') : adhEmpty('cotisations', 7)}</tbody>`;
     $('#coti-sum').innerHTML = adhSum('cotisations', 'livré');
 
     const sRows = adhRowsFor('soutien');
-    $('#soutien-table').innerHTML = `<thead><tr><th>Prénom</th><th>Nom</th><th>Goodies voulus</th><th>Date</th><th>Donné</th></tr></thead><tbody>${sRows.length ? sRows.map((r) => `
+    $('#soutien-table').innerHTML = `<thead><tr><th>Prénom</th><th>Nom</th><th>Goodies voulus</th><th>Date</th><th>Donné</th><th></th></tr></thead><tbody>${sRows.length ? sRows.map((r) => `
       <tr class="${r.done ? 'is-done' : ''}">
         <td>${esc(r.firstName)}</td><td><b>${esc(r.lastName)}</b></td><td>${esc(r.goodies)}</td>
         <td class="faint">${esc(r.date)}</td>
         <td><label class="deliver"><input type="checkbox" data-deliver="soutien" data-id="${esc(r.id)}" ${r.done ? 'checked' : ''}> ${r.done ? 'Donné' : 'À donner'}</label></td>
-      </tr>`).join('') : adhEmpty('soutien', 5)}</tbody>`;
+        <td class="num">${delBtnAdh('soutien', r.id)}</td>
+      </tr>`).join('') : adhEmpty('soutien', 6)}</tbody>`;
     $('#soutien-sum').innerHTML = adhSum('soutien', 'servi');
 
     // Combien de chaque goodie
@@ -1648,7 +1669,7 @@
   ['#coti-search', '#soutien-search'].forEach((sel) => $(sel).addEventListener('input', renderAdhAdmin));
   function adhCsv(sheet) {
     const cols = sheet === 'cotisations'
-      ? [['Prénom', 'firstName'], ['Nom', 'lastName'], ['Chambre', 'room'], ['Preuve', 'proof'], ['Date', 'date'], ['Sac livré', 'done']]
+      ? [['Prénom', 'firstName'], ['Nom', 'lastName'], ['Chambre', 'room'], ['Date', 'date'], ['Sac livré', 'done']]
       : [['Prénom', 'firstName'], ['Nom', 'lastName'], ['Goodies', 'goodies'], ['Date', 'date'], ['Donné', 'done']];
     const cell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
     const lines = adh.rows[sheet].map((r) => cols.map(([, k]) => cell(k === 'done' ? (r.done ? 'Oui' : 'Non') : r[k])).join(','));
@@ -1722,6 +1743,8 @@
     }
     if (t.dataset.adhRefresh !== undefined) { loadAdhesions(); return; }
     if (t.dataset.adhCsv) { adhCsv(t.dataset.adhCsv); return; }
+    if (t.dataset.proof) { showProof(t.dataset.proof, t.dataset.caption || 'Preuve de paiement'); return; }
+    if (t.dataset.adhDel) { deleteAdh(t.dataset.adhDel, t.dataset.id); return; }
     if (t.dataset.afilter) { adh.filter[t.closest('#coti-filter') ? 'cotisations' : 'soutien'] = t.dataset.afilter; renderAdhAdmin(); return; }
     if (t.dataset.del === 'goodie' || t.dataset.del === 'perk') {
       if (!confirm('Supprimer cet élément ?')) return;
