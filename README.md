@@ -6,7 +6,7 @@ Site statique : aucun serveur ni installation. Ouvrez `index.html` dans un navig
 Adresse une fois publiée : https://margauxbouriez-a11y.github.io/junior-entreprise-manager/
 
 ## Fichiers
-- `data.js` — le contenu du site. Il est mis à jour automatiquement depuis l'Espace liste (voir plus bas). La partie publique (programme, food, équipe…) est lisible ; la partie privée (budget, stocks, abonnés) est chiffrée.
+- `data.js` — le contenu du site. Il est mis à jour automatiquement depuis l'Espace liste (voir plus bas). La partie publique (programme, food, équipe…) est lisible ; la partie privée (budget, stocks, menus, abonnés) est chiffrée.
 - `index.html` — la mise en page et les textes fixes.
 - `app.js` — le fonctionnement.
 
@@ -26,7 +26,13 @@ Adresse une fois publiée : https://margauxbouriez-a11y.github.io/junior-entrepr
 ## Espace liste (bouton « Espace liste », ou `#liste` à la fin de l'adresse)
 Code d'accès par défaut : `leclercq2026` (modifiable dans Réglages). Il chiffre aussi les données privées.
 - **Aperçu** (page d'accueil de l'espace) : les stocks food à surveiller avec boutons +/−, la position et le statut de chaque membre (modifiables directement), et les stands food du jour avec le compteur de portions servies.
-- **Stocks food** : un produit par carte, rangé par catégorie (Food, Boissons, Matériel…), avec boutons +/−, seuil d'alerte, filtre « À racheter » et liste de courses générée.
+- **Stocks food** : un produit par carte, rangé par catégorie (Food, Boissons, Matériel…), avec boutons +/−, seuil d'alerte, filtre « À racheter », quantité prévue dans les menus et liste de courses générée (seuils + besoins des menus).
+- **Menus** : les menus des 2 semaines de campagne, jour par jour (onglets Semaine 1 / Semaine 2). Chaque menu a un nom, un moment (déjeuner, stand food…), un nombre de portions, sa **recette** et ses **ingrédients avec les quantités**. Un bouton crée directement le menu d'un stand food du jour.
+  - **Lien avec les stocks** : chaque ingrédient est relié au produit du même nom dans « Stocks food » (suggestions pendant la saisie, unité reprise automatiquement). Un ingrédient absent des stocks y est créé à 0.
+  - Pour chaque ingrédient, le site indique s'il y en a assez en stock, en tenant compte des menus prévus avant.
+  - **Préparé : retirer du stock** déduit les quantités des stocks (bouton pour annuler et les remettre).
+  - Le tableau « Ingrédients nécessaires » et la liste de courses de « Stocks food » ajoutent ce qu'il faut acheter pour les menus ; chaque carte de stock affiche la quantité prévue dans les menus.
+  - Les menus sont dans la partie privée (chiffrée) de `data.js`, comme les stocks, et se publient automatiquement.
 - **Où sont les membres** : une carte par membre ; un clic pour changer de statut (Disponible, Occupé·e, En pause, Absent·e), un champ pour la position (avec suggestions des lieux connus), et l'heure de la dernière mise à jour.
 - **Budget** : recettes et dépenses, solde, plafond, dépenses par poste.
 - **Boutique** : catalogue des articles offerts, limite par commande, disponibilité, ouverture ou fermeture de la boutique.

@@ -561,6 +561,33 @@
   .partner .thumb { width: 72px; height: 72px; }
   .partner-link { font-weight: 600; font-size: 14px; color: var(--gold); text-decoration: none; margin-top: auto; }
 
+  /* Espace liste : menus */
+  .menu-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+  .menu-day { margin-bottom: 28px; }
+  .menu-day-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding-bottom: 10px; margin-bottom: 12px; border-bottom: 1px solid var(--line); }
+  .menu-day-head h4 { font-size: 15px; text-transform: capitalize; }
+  .menu-day-head h4 small { font-weight: 400; color: var(--text-3); font-size: 13px; margin-left: 8px; text-transform: none; }
+  .menu-day-head.today h4 { color: var(--gold); }
+  .menu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr)); gap: 12px; }
+  .menu-card { gap: 12px; }
+  .menu-card.done { border-color: rgba(94, 240, 176, .45); }
+  .menu-card .row3 { display: grid; grid-template-columns: minmax(0, 1fr) 130px 120px; gap: 8px; }
+  .menu-card .menu-name { font-weight: 600; font-size: 15px; }
+  .ing-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .ing-table th { background: none; padding: 0 4px 6px; font-size: 11px; }
+  .ing-table td { padding: 4px; border: 0; vertical-align: middle; }
+  .ing-table td input { height: 32px; padding: 0 8px; }
+  .ing-table .c-qty { width: 76px; } .ing-table .c-unit { width: 78px; } .ing-table .c-del { width: 28px; text-align: right; }
+  .ing-table .unit-txt { color: var(--text-3); padding-left: 4px; white-space: nowrap; }
+  .ing-state { grid-column: 1 / -1; font-size: 12px; padding: 0 4px 6px; }
+  .ing-state.ok { color: var(--ok); } .ing-state.warn { color: var(--warn); } .ing-state.bad { color: var(--bad); } .ing-state.info { color: var(--text-3); }
+  .ing-del { border: 0; background: none; color: var(--text-3); cursor: pointer; font-size: 16px; line-height: 1; padding: 4px; }
+  .ing-del:hover { color: var(--bad); }
+  .menu-stand { font-size: 12px; }
+  .stock-card .reserved { font-size: 12px; color: var(--text-3); }
+  .stock-card .reserved b { color: var(--warn); font-weight: 600; }
+  @media (max-width: 560px) { .menu-card .row3 { grid-template-columns: 1fr 1fr; } .menu-card .row3 > :first-child { grid-column: 1 / -1; } }
+
   /* Espace liste : cartes d'édition */
   .item .ph { display: block; width: calc(100% + 44px); margin: -22px -22px 10px; aspect-ratio: 4 / 3; padding: 0; border: 0; border-bottom: 1px solid rgba(255, 255, 255, .16); border-radius: 6px 6px 0 0; overflow: hidden; background: var(--royal-deep); cursor: zoom-in; position: relative; }
   .item .ph img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .3s; }
@@ -996,6 +1023,7 @@
     <div class="tabs" id="admin-tabs">
       <button data-tab="overview" class="on">Aperçu</button>
       <button data-tab="stock">Stocks food</button>
+      <button data-tab="menus">Menus</button>
       <button data-tab="members">Où sont les membres</button>
       <button data-tab="budget">Budget</button>
       <button data-tab="shop">Boutique</button>
@@ -1064,6 +1092,21 @@
       </form>
       <h3 class="sub-head">Liste de courses</h3>
       <div class="card panel"><p class="muted" id="shopping" style="margin:0"></p><div style="margin-top:14px"><button class="btn btn-ghost btn-sm" id="copy-shopping" type="button">Copier la liste</button></div></div>
+    </div>
+
+    <!-- Menus des 2 semaines -->
+    <div data-panel="menus" id="menus-panel" hidden>
+      <div class="menu-top">
+        <div class="stock-filters" id="menu-weeks" style="margin:0"></div>
+        <div class="toolbar" id="menu-sum"></div>
+      </div>
+      <p class="faint" style="margin:0 0 20px">Un menu par repas ou par stand : la recette, les portions et les ingrédients. Chaque ingrédient est relié au produit du même nom dans « Stocks food » (il y est créé s'il n'existe pas). Quand un menu est préparé, ses quantités sont retirées du stock.</p>
+      <div id="menu-days"></div>
+      <h3 class="sub-head">Ingrédients nécessaires pour les menus à venir</h3>
+      <p class="faint" style="margin:-4px 0 12px">Total des menus pas encore préparés, comparé au stock actuel.</p>
+      <div class="table-wrap"><table id="menu-needs"></table></div>
+      <div class="toolbar" style="margin-top:14px"><button class="btn btn-ghost btn-sm" id="copy-menu-shopping" type="button">Copier les achats pour les menus</button></div>
+      <datalist id="menu-stock-names"></datalist>
     </div>
 
     <!-- E-mails -->

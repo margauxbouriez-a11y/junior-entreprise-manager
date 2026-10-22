@@ -20,8 +20,8 @@
   // data.js contient la partie publique en clair (programme, food, équipe…) et la
   // partie privée (budget, stocks, abonnés, campagnes) chiffrée avec le code
   // d'accès de la liste : seuls les membres qui ont le code peuvent la lire.
-  const PRIVATE_KEYS = ['budget', 'budgetCap', 'stock', 'subscribers', 'campaigns', 'adhesionsKey'];
-  const PRIVATE_DEFAULTS = { budget: [], budgetCap: 0, stock: [], subscribers: [], campaigns: [], adhesionsKey: '' };
+  const PRIVATE_KEYS = ['budget', 'budgetCap', 'stock', 'menus', 'subscribers', 'campaigns', 'adhesionsKey'];
+  const PRIVATE_DEFAULTS = { budget: [], budgetCap: 0, stock: [], menus: [], subscribers: [], campaigns: [], adhesionsKey: '' };
   const splitData = (full) => {
     const pub = {}; const priv = {};
     Object.keys(full).forEach((k) => { (PRIVATE_KEYS.includes(k) ? priv : pub)[k] = full[k]; });
@@ -1076,6 +1076,8 @@
     $('#kpis').innerHTML = kpis.map(([l, n, bad]) => `<div class="card kpi"><div class="label">${l}</div><div class="num ${bad ? 'neg' : ''}">${esc(n)}</div></div>`).join('');
     const stockTab = $('#admin-tabs [data-tab="stock"]');
     stockTab.innerHTML = `Stocks food${low ? `<span class="count">${low}</span>` : ''}`;
+    const menuMissing = menuShortages().filter((x) => x.missing > 0).length;
+    $('#admin-tabs [data-tab="menus"]').innerHTML = `Menus${menuMissing ? `<span class="count">${menuMissing}</span>` : ''}`;
     renderSyncBanner();
   }
 
@@ -1133,6 +1135,7 @@
     const state = stockState(st);
     const pct = Math.min(100, (q / Math.max(th * 3, q, 1)) * 100);
     const big = Math.max(1, Math.round(th / 2));
+    const reserved = menuPlan().need.get(st.id) || 0;
     return `<div class="stock-card ${state.cls}">
       <div class="top"><h4>${esc(st.name)}</h4>${state.chip}</div>
       <div class="qty">${esc(num(q))}<small>${esc(st.unit)}</small></div>
@@ -1144,6 +1147,7 @@
         <button type="button" data-step="1" data-id="${st.id}">+</button>
         <button type="button" data-step="${big}" data-id="${st.id}">+${big}</button>
       </span>
+      ${reserved ? `<div class="reserved">Prévu dans les menus : <b>${esc(fmtQty(reserved))} ${esc(st.unit)}</b>${reserved > q ? ` · manque ${esc(fmtQty(reserved - q))}` : ''}</div>` : ''}
       <div class="foot"><span>Alerte sous ${esc(num(th))} ${esc(st.unit)}</span><button class="del" type="button" data-del="stock" data-id="${esc(st.id)}">Supprimer</button></div>
     </div>`;
   }
@@ -1165,10 +1169,245 @@
     }
     $('#stock-list').innerHTML = html;
     $('#stock-cats').innerHTML = [...new Set(['Food', 'Boissons', 'Matériel', ...cats])].map((c) => `<option>${esc(c)}</option>`).join('');
-    $('#shopping').textContent = low.length
-      ? low.map((st) => `${st.name} : ${Math.max(1, Number(st.threshold) * 2 - Number(st.quantity))} ${st.unit}`).join(' · ')
-      : 'Tous les stocks sont au-dessus du seuil.';
+    const need = menuPlan().need;
+    const buy = data.stock.map((st) => {
+      const q = Number(st.quantity) || 0; const th = Number(st.threshold) || 0;
+      const forThreshold = q <= th ? Math.max(1, th * 2 - q) : 0;
+      const forMenus = Math.max(0, (need.get(st.id) || 0) - q);
+      return { st, n: Math.max(forThreshold, forMenus), menus: forMenus > 0 && forMenus >= forThreshold };
+    }).filter((x) => x.n > 0).sort((a, b) => a.st.name.localeCompare(b.st.name, 'fr'));
+    $('#shopping').textContent = buy.length
+      ? buy.map((x) => `${x.st.name} : ${fmtQty(x.n)} ${x.st.unit}${x.menus ? ' (menus)' : ''}`).join(' · ')
+      : 'Tous les stocks sont au-dessus du seuil et couvrent les menus.';
   }
+
+  // ---------- Menus des 2 semaines (liés aux stocks) ----------
+  // Chaque menu : date, moment, nom, portions, recette et ingrédients.
+  // Un ingrédient est relié à un produit de « Stocks food » (stockId) : même nom,
+  // même unité. S'il n'existe pas, il est créé dans les stocks (quantité 0).
+  // « Préparé » retire les quantités du stock ; « Annuler » les remet.
+  const MOMENTS = ['Petit-déjeuner', 'Déjeuner', 'Goûter', 'Dîner', 'Stand food', 'Soirée'];
+  let menuWeek = 0;
+  const menus = () => (data.menus = data.menus || []);
+  const normName = (s) => String(s || '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const stockByName = (name) => data.stock.find((st) => normName(st.name) === normName(name));
+  const stockOf = (ing) => (ing.stockId && data.stock.find((st) => st.id === ing.stockId)) || (ing.name ? stockByName(ing.name) : null);
+  const momentIdx = (m) => { const i = MOMENTS.indexOf(m); return i < 0 ? MOMENTS.length : i; };
+  const byMenuOrder = (a, b) => (a.date || '').localeCompare(b.date || '') || momentIdx(a.moment) - momentIdx(b.moment);
+  const fmtQty = (n) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2 }).format(Number(n) || 0);
+
+  // Besoins des menus pas encore préparés, dans l'ordre chronologique :
+  // pour chaque ingrédient, ce qu'il restera en stock une fois les menus précédents faits.
+  function menuPlan() {
+    const left = new Map(data.stock.map((st) => [st.id, Number(st.quantity) || 0]));
+    const need = new Map(); const state = new Map();
+    [...menus()].filter((m) => !m.done).sort(byMenuOrder).forEach((m) => {
+      (m.ingredients || []).forEach((ing) => {
+        const st = stockOf(ing); const q = Number(ing.qty) || 0;
+        if (!st || !q) { state.set(ing.id, null); return; }
+        need.set(st.id, (need.get(st.id) || 0) + q);
+        const avail = left.get(st.id) || 0;
+        state.set(ing.id, { st, avail, missing: Math.max(0, q - avail) });
+        left.set(st.id, avail - q);
+      });
+    });
+    return { need, state };
+  }
+  function menuShortages() {
+    const { need } = menuPlan();
+    return data.stock.map((st) => ({ st, need: need.get(st.id) || 0, missing: Math.max(0, (need.get(st.id) || 0) - (Number(st.quantity) || 0)) }))
+      .filter((x) => x.need > 0);
+  }
+
+  function ingRow(m, ing, plan) {
+    const st = stockOf(ing);
+    const s = plan.state.get(ing.id);
+    let stateHtml;
+    if (!ing.name) stateHtml = '<span class="ing-state info">Choisissez un produit du stock ou tapez un nouveau nom.</span>';
+    else if (!st) stateHtml = '<span class="ing-state info">Produit absent des stocks.</span>';
+    else if (m.done) stateHtml = `<span class="ing-state info">Préparé : ${fmtQty(ing.qty)} ${esc(st.unit)} retirés du stock.</span>`;
+    else if (!Number(ing.qty)) stateHtml = `<span class="ing-state info">${fmtQty(st.quantity)} ${esc(st.unit)} en stock. Indiquez la quantité.</span>`;
+    else if (s && s.missing > 0) stateHtml = `<span class="ing-state ${s.avail > 0 ? 'warn' : 'bad'}">Manque ${fmtQty(s.missing)} ${esc(st.unit)} (${fmtQty(Math.max(0, s.avail))} disponibles après les menus précédents).</span>`;
+    else stateHtml = `<span class="ing-state ok">OK : ${fmtQty(s ? s.avail : st.quantity)} ${esc(st.unit)} disponibles.</span>`;
+    const unitEditable = !st || Number(st.quantity) === 0;
+    const unit = st ? st.unit : (ing.unit || '');
+    const dis = m.done ? ' disabled' : '';
+    return `<tr>
+      <td><input list="menu-stock-names" value="${esc(ing.name)}" data-ing="${ing.id}" data-menu-id="${m.id}" data-field="name" placeholder="Ingrédient" aria-label="Ingrédient"${dis}></td>
+      <td class="c-qty"><input type="number" min="0" step="any" value="${esc(ing.qty ?? '')}" data-ing="${ing.id}" data-menu-id="${m.id}" data-field="qty" placeholder="Qté" aria-label="Quantité de ${esc(ing.name)}"${dis}></td>
+      <td class="c-unit">${unitEditable && !m.done
+        ? `<input value="${esc(unit)}" data-ing="${ing.id}" data-menu-id="${m.id}" data-field="unit" placeholder="kg, L…" aria-label="Unité">`
+        : `<span class="unit-txt">${esc(unit)}</span>`}</td>
+      <td class="c-del">${m.done ? '' : `<button class="ing-del" type="button" data-ing-del="${ing.id}" data-menu-id="${m.id}" aria-label="Retirer l'ingrédient">×</button>`}</td>
+    </tr><tr><td colspan="4" style="padding-top:0">${stateHtml}</td></tr>`;
+  }
+
+  function menuCard(m, plan, days) {
+    const ings = m.ingredients || [];
+    const missing = ings.filter((i) => { const s = plan.state.get(i.id); return s && s.missing > 0; }).length;
+    const chip = m.done ? '<span class="chip ok dot">Préparé</span>'
+      : missing ? `<span class="chip warn dot">${missing} ingrédient${missing > 1 ? 's' : ''} à acheter</span>`
+        : ings.length ? '<span class="chip ok dot">Tout est en stock</span>' : '<span class="chip">Sans ingrédient</span>';
+    const dateOpts = [...new Set([...days, m.date].filter(Boolean))].sort().map((d) => `<option value="${d}"${d === m.date ? ' selected' : ''}>${esc(fmtShort(d))}</option>`).join('');
+    return `<div class="edit-card menu-card${m.done ? ' done' : ''}">
+      <div class="row3">
+        <input class="menu-name" value="${esc(m.name)}" data-menu="${m.id}" data-field="name" placeholder="Nom du menu (ex. Crêpes)" aria-label="Nom du menu">
+        <select data-menu="${m.id}" data-field="moment" aria-label="Moment">${MOMENTS.map((x) => `<option${x === m.moment ? ' selected' : ''}>${x}</option>`).join('')}</select>
+        <select data-menu="${m.id}" data-field="date" aria-label="Jour">${dateOpts}</select>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">${chip}
+        <label class="mini-field" style="display:flex;gap:6px;align-items:center;grid-auto-flow:column">Portions
+          <input type="number" min="0" step="1" style="width:80px;height:32px" value="${esc(m.portions ?? '')}" data-menu="${m.id}" data-field="portions" aria-label="Nombre de portions"></label></div>
+      <label class="mini-field">Recette
+        <textarea rows="4" data-menu="${m.id}" data-field="recipe" placeholder="Étapes de la recette, cuisson, matériel…">${esc(m.recipe)}</textarea></label>
+      <div class="mini-field">Ingrédients et quantités <span style="font-size:11px">(reliés à « Stocks food »)</span></div>
+      <table class="ing-table"><thead><tr><th>Ingrédient</th><th>Quantité</th><th>Unité</th><th></th></tr></thead>
+        <tbody>${ings.map((i) => ingRow(m, i, plan)).join('') || '<tr><td colspan="4" class="faint" style="padding:4px">Aucun ingrédient pour le moment.</td></tr>'}</tbody></table>
+      ${m.done ? '' : `<div><button class="btn btn-ghost btn-sm" type="button" data-ing-add="${m.id}">+ Ingrédient</button></div>`}
+      <div class="foot">
+        <span class="toolbar">${m.done
+          ? `<button class="btn btn-ghost btn-sm" type="button" data-menu-undo="${m.id}">Annuler « préparé » (remettre en stock)</button>`
+          : `<button class="btn btn-sm" type="button" data-menu-done="${m.id}"${ings.length ? '' : ' disabled'}>Préparé : retirer du stock</button>`}
+          <button class="btn btn-ghost btn-sm" type="button" data-menu-copy="${m.id}">Dupliquer</button></span>
+        <button class="del" type="button" data-menu-del="${m.id}" style="border:0;background:none;color:var(--text-3);cursor:pointer;text-decoration:underline;font:12px var(--font)">Supprimer</button>
+      </div>
+    </div>`;
+  }
+
+  function renderMenus() {
+    const days = campaignDays();
+    const weeks = Math.max(1, Math.ceil(days.length / 7));
+    if (menuWeek >= weeks) menuWeek = 0;
+    const plan = menuPlan();
+    const shortages = menuShortages().filter((x) => x.missing > 0);
+    const all = menus();
+    $('#menu-weeks').innerHTML = Array.from({ length: weeks }, (_, w) => {
+      const wd = days.slice(w * 7, w * 7 + 7);
+      const n = all.filter((m) => wd.includes(m.date)).length;
+      return `<button type="button" data-menu-week="${w}" class="${w === menuWeek ? 'on' : ''}">Semaine ${w + 1} · ${esc(fmtShort(wd[0]))} → ${esc(fmtShort(wd[wd.length - 1]))} (${n})</button>`;
+    }).join('');
+    const pending = all.filter((m) => !m.done).length;
+    $('#menu-sum').innerHTML = `<span class="chip">${all.length} menu${all.length > 1 ? 's' : ''}</span><span class="chip ok">${all.length - pending} préparé${all.length - pending > 1 ? 's' : ''}</span>`
+      + (shortages.length ? `<span class="chip warn dot">${shortages.length} produit${shortages.length > 1 ? 's' : ''} à acheter</span>` : '<span class="chip ok dot">Stocks suffisants</span>');
+
+    const wd = days.slice(menuWeek * 7, menuWeek * 7 + 7);
+    // Menus hors des 2 semaines (si les dates de campagne ont changé) : affichés dans la dernière semaine
+    const outside = menuWeek === weeks - 1 ? all.filter((m) => !days.includes(m.date)) : [];
+    const blocks = wd.map((d) => {
+      const dayMenus = all.filter((m) => m.date === d).sort(byMenuOrder);
+      const stands = data.food.filter((f) => f.date === d);
+      const standBtns = stands.filter((f) => !dayMenus.some((m) => normName(m.name) === normName(f.name)))
+        .map((f) => `<button class="btn btn-ghost btn-sm menu-stand" type="button" data-menu-from-stand="${f.id}">+ Menu du stand « ${esc(f.name)} »</button>`).join('');
+      return `<section class="menu-day">
+        <div class="menu-day-head${d === todayIso ? ' today' : ''}"><h4>${esc(fmtLong(d))}${d === todayIso ? '<small>aujourd\'hui</small>' : ''}<small>${dayMenus.length ? `${dayMenus.length} menu${dayMenus.length > 1 ? 's' : ''}` : 'aucun menu'}</small></h4>
+          <span class="toolbar">${standBtns}<button class="btn btn-ghost btn-sm" type="button" data-menu-add="${d}">+ Ajouter un menu</button></span></div>
+        ${dayMenus.length ? `<div class="menu-grid">${dayMenus.map((m) => menuCard(m, plan, days)).join('')}</div>` : ''}
+      </section>`;
+    }).join('');
+    const extra = outside.length ? `<section class="menu-day"><div class="menu-day-head"><h4>Hors des dates de campagne<small>${outside.length}</small></h4></div><div class="menu-grid">${outside.sort(byMenuOrder).map((m) => menuCard(m, plan, days)).join('')}</div></section>` : '';
+    $('#menu-days').innerHTML = blocks + extra;
+
+    $('#menu-stock-names').innerHTML = [...data.stock].sort((a, b) => a.name.localeCompare(b.name, 'fr')).map((st) => `<option value="${esc(st.name)}">${esc(fmtQty(st.quantity))} ${esc(st.unit)} en stock</option>`).join('');
+    const rows = menuShortages().sort((a, b) => b.missing - a.missing || a.st.name.localeCompare(b.st.name, 'fr'));
+    $('#menu-needs').innerHTML = '<tr><th>Produit</th><th class="num">Besoin des menus</th><th class="num">En stock</th><th class="num">À acheter</th></tr>' + (rows.length
+      ? rows.map((x) => `<tr><td>${esc(x.st.name)}</td><td class="num">${fmtQty(x.need)} ${esc(x.st.unit)}</td><td class="num">${fmtQty(x.st.quantity)} ${esc(x.st.unit)}</td>
+        <td class="num">${x.missing > 0 ? `<span class="chip warn">${fmtQty(x.missing)} ${esc(x.st.unit)}</span>` : '<span class="chip ok">0</span>'}</td></tr>`).join('')
+      : '<tr><td colspan="4" class="faint">Aucun ingrédient prévu dans les menus à venir.</td></tr>');
+  }
+  const menuShoppingText = () => {
+    const s = menuShortages().filter((x) => x.missing > 0);
+    return s.length ? s.map((x) => `${x.st.name} : ${fmtQty(x.missing)} ${x.st.unit}`).join(' · ') : 'Rien à acheter pour les menus.';
+  };
+
+  // Relie un ingrédient au stock (création du produit si besoin)
+  function linkIngredient(ing) {
+    if (!ing.name) { ing.stockId = ''; return ''; }
+    let st = stockByName(ing.name);
+    let note = '';
+    if (!st) {
+      st = { id: uid('k'), name: ing.name.trim(), category: 'Food', unit: (ing.unit || '').trim() || 'unités', quantity: 0, threshold: 0 };
+      data.stock.push(st);
+      note = `« ${st.name} » a été ajouté aux stocks (quantité 0).`;
+    }
+    ing.stockId = st.id; ing.name = st.name; ing.unit = st.unit;
+    return note;
+  }
+  const findMenu = (id) => menus().find((m) => m.id === id);
+  function newMenu(date, extra = {}) {
+    menus().push({ id: uid('m'), date, moment: 'Déjeuner', name: '', portions: '', recipe: '', ingredients: [], done: false, deducted: [], ...extra });
+  }
+
+  $('#menus-panel').addEventListener('click', (e) => {
+    const t = e.target.closest('button'); if (!t) return;
+    const d = t.dataset;
+    if (d.menuWeek !== undefined) { menuWeek = Number(d.menuWeek); renderMenus(); return; }
+    if (d.menuAdd) { newMenu(d.menuAdd); save(); return; }
+    if (d.menuFromStand) {
+      const f = findIn('food', d.menuFromStand);
+      if (f) { newMenu(f.date, { name: f.name, moment: 'Stand food', portions: f.planned || '' }); save(); }
+      return;
+    }
+    if (d.ingAdd) { const m = findMenu(d.ingAdd); m.ingredients = [...(m.ingredients || []), { id: uid('i'), name: '', qty: '', unit: '', stockId: '' }]; save(); return; }
+    if (d.ingDel) { const m = findMenu(d.menuId); m.ingredients = (m.ingredients || []).filter((i) => i.id !== d.ingDel); save(); return; }
+    if (d.menuCopy) {
+      const m = findMenu(d.menuCopy);
+      newMenu(m.date, { ...clone(m), id: uid('m'), name: m.name ? `${m.name} (copie)` : '', done: false, deducted: [], ingredients: (m.ingredients || []).map((i) => ({ ...i, id: uid('i') })) });
+      save(); return;
+    }
+    if (d.menuDel) {
+      const m = findMenu(d.menuDel);
+      if (!confirm(m && m.done ? 'Supprimer ce menu ? Les quantités déjà retirées du stock ne seront pas remises.' : 'Supprimer ce menu ?')) return;
+      data.menus = menus().filter((x) => x.id !== d.menuDel); save(); return;
+    }
+    if (d.menuDone) {
+      const m = findMenu(d.menuDone);
+      const short = (m.ingredients || []).filter((i) => { const st = stockOf(i); return st && Number(i.qty) > Number(st.quantity); });
+      if (short.length && !confirm(`Stock insuffisant pour : ${short.map((i) => i.name).join(', ')}.\nRetirer quand même ce qui reste (le stock passera à 0) ?`)) return;
+      m.deducted = [];
+      (m.ingredients || []).forEach((i) => {
+        const st = stockOf(i); const q = Number(i.qty) || 0;
+        if (!st || !q) return;
+        const take = Math.min(q, Number(st.quantity) || 0);
+        st.quantity = Math.max(0, (Number(st.quantity) || 0) - take);
+        m.deducted.push({ stockId: st.id, qty: take });
+      });
+      m.done = true; m.doneAt = new Date().toISOString(); save(); return;
+    }
+    if (d.menuUndo) {
+      const m = findMenu(d.menuUndo);
+      (m.deducted || []).forEach((x) => { const st = data.stock.find((s) => s.id === x.stockId); if (st) st.quantity = (Number(st.quantity) || 0) + Number(x.qty); });
+      m.done = false; m.deducted = []; delete m.doneAt; save();
+    }
+  });
+  $('#menus-panel').addEventListener('change', (e) => {
+    const t = e.target;
+    if (t.dataset.menu) {
+      const m = findMenu(t.dataset.menu); if (!m) return;
+      m[t.dataset.field] = t.dataset.field === 'portions' ? (t.value === '' ? '' : Math.max(0, Number(t.value) || 0)) : t.value;
+      t.blur(); save(); return;
+    }
+    if (t.dataset.ing) {
+      const m = findMenu(t.dataset.menuId); const ing = m && (m.ingredients || []).find((i) => i.id === t.dataset.ing); if (!ing) return;
+      const f = t.dataset.field;
+      if (f === 'qty') ing.qty = t.value === '' ? '' : Math.max(0, Number(t.value) || 0);
+      else if (f === 'unit') {
+        ing.unit = t.value.trim();
+        const st = stockOf(ing); if (st && Number(st.quantity) === 0 && ing.unit) st.unit = ing.unit; // produit encore vide : l'unité suit
+      } else if (f === 'name') {
+        ing.name = t.value.trim();
+        const note = linkIngredient(ing);
+        if (note) setTimeout(() => alertNote(note), 0);
+      }
+      t.blur(); save();
+    }
+  });
+  function alertNote(text) {
+    const el = document.createElement('div');
+    el.className = 'banner'; el.style.cssText = 'background:var(--bg-2);border-color:var(--gold);position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:50;max-width:min(92vw,520px)';
+    el.textContent = text; document.body.appendChild(el);
+    setTimeout(() => el.remove(), 3500);
+  }
+  $('#copy-menu-shopping').addEventListener('click', (e) => copy(menuShoppingText(), e.target));
 
   function audienceEmails(audience) {
     if (audience === 'membres') return [];
@@ -1517,8 +1756,8 @@
     if (!isAdmin) return;
     // Ne pas écraser un champ en cours de saisie
     const active = document.activeElement;
-    if (active && active.matches('#admin-app [data-member], #admin-app [data-qty], #admin-app [data-food], #admin-app [data-product], #admin-app [data-partner], #admin-app [data-prize], #admin-app [data-goodie], #admin-app [data-perk]')) return;
-    renderKpis(); renderOverview(); renderBudget(); renderStock(); renderEmails(); renderFoodAdmin(); renderShopAdmin(); renderCotiAdmin(); renderSoutienAdmin(); renderAdhAdmin(); renderContestAdmin(); renderPartnersAdmin(); renderEventsAdmin(); renderMembersAdmin(); renderSettings();
+    if (active && active.matches('#admin-app [data-member], #admin-app [data-qty], #admin-app [data-food], #admin-app [data-product], #admin-app [data-partner], #admin-app [data-prize], #admin-app [data-goodie], #admin-app [data-perk], #admin-app [data-menu], #admin-app [data-ing]')) return;
+    renderKpis(); renderOverview(); renderBudget(); renderStock(); renderMenus(); renderEmails(); renderFoodAdmin(); renderShopAdmin(); renderCotiAdmin(); renderSoutienAdmin(); renderAdhAdmin(); renderContestAdmin(); renderPartnersAdmin(); renderEventsAdmin(); renderMembersAdmin(); renderSettings();
   }
 
   function renderPublic() {
