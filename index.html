@@ -1289,17 +1289,26 @@
           <label class="field"><span>Fin des inscriptions</span><input name="endsAt" type="datetime-local"></label>
           <label class="field"><span>Règlement <em>(affiché sous le formulaire)</em></span><textarea name="rules" rows="3"></textarea></label>
           <label class="field"><span>Webhook d'inscription (URL de production n8n)</span><input name="webhook" type="url" placeholder="https://….app.n8n.cloud/webhook/leclercq-concours"></label>
-          <label class="field"><span>Lien du Google Sheet des inscrits <em>(pour l'équipe, jamais affiché sur le site)</em></span><input name="sheetUrl" type="url" placeholder="https://docs.google.com/spreadsheets/…"></label>
           <div class="toolbar"><button class="btn" type="submit">Enregistrer</button></div>
           <p class="note" id="contest-admin-status"></p>
         </form>
         <div class="card panel">
           <h3>Inscrits en direct</h3>
           <div class="live-count"><b id="contest-admin-count">—</b><span>participants</span></div>
-          <div class="toolbar"><button class="btn btn-ghost btn-sm" type="button" id="contest-refresh">Actualiser</button><a class="btn btn-ghost btn-sm" id="contest-sheet-link" href="#" target="_blank" rel="noopener" hidden>Ouvrir la liste des inscrits</a></div>
-          <p class="faint" style="margin-top:12px">Le nombre vient du Google Sheet rempli par n8n (workflow <code>n8n/concours-workflow.json</code>). Une même adresse e-mail ne compte qu'une fois.</p>
+          <div class="toolbar"><button class="btn btn-ghost btn-sm" type="button" id="contest-refresh">Actualiser</button></div>
+          <p class="faint" style="margin-top:12px">n8n garde la liste lui-même (workflow <code>n8n/concours-workflow.json</code>), pas besoin de Google Sheet. Une même adresse e-mail ne compte qu'une fois. La liste utilise la même clé secrète que les cotisations.</p>
         </div>
       </div>
+      <h3 class="sub-head">Les inscrits</h3>
+      <div class="adh-tools">
+        <input type="search" id="conc-search" placeholder="Rechercher un nom, un e-mail…" aria-label="Rechercher">
+        <button class="btn btn-ghost btn-sm" type="button" data-conc-refresh>Actualiser</button>
+        <button class="btn btn-ghost btn-sm" type="button" data-conc-csv>Exporter CSV</button>
+        <button class="btn btn-sm" type="button" data-conc-draw>Tirer au sort</button>
+        <span class="adh-sum" id="conc-sum"></span>
+      </div>
+      <p class="note" id="conc-draw-result"></p>
+      <div class="table-wrap"><table id="conc-table"></table></div>
       <h3 class="sub-head">Lots à gagner</h3>
       <div class="admin-cards" id="prizes-admin"></div>
       <form id="prize-form" class="form-grid card panel" style="margin-top:12px">

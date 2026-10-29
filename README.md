@@ -79,17 +79,16 @@ Dans la section **Commander**, les étudiants ajoutent des articles à leur comm
 
 Tant qu'aucun webhook n'est réglé, la commande ouvre la messagerie de l'étudiant vers l'e-mail de contact de la liste. Sans e-mail de contact non plus, le site indique que les commandes ne sont pas encore ouvertes.
 
-## Jeu concours via n8n + Google Sheet
-Les inscriptions sont enregistrées dans un Google Sheet (une ligne par adresse e-mail : s'inscrire deux fois ne compte qu'une fois). Le site affiche le nombre d'inscrits en direct, mis à jour chaque minute.
-1. Dans le même Google Sheet (ou un autre), ajoutez un onglet `Concours` et importez-y `n8n/modele-concours.csv` (colonnes Date, Nom, E-mail, Téléphone).
-2. Dans n8n, importez `n8n/concours-workflow.json`. Dans les trois nœuds Google Sheets, choisissez votre compte Google et collez l'adresse du Sheet. Dans **Confirmation au participant**, choisissez votre compte Gmail.
-3. **Save**, puis **Publish**. Copiez la **Production URL** du nœud « Inscription reçue » (elle finit par `/webhook/leclercq-concours`).
-4. Sur le site : **Espace liste → Jeu concours**, collez l'URL dans **Webhook d'inscription**, et l'adresse du Sheet dans **Lien du Google Sheet des inscrits**, cochez **Inscriptions ouvertes**, puis **Enregistrer**.
-5. Ajoutez les lots (nom + photo) juste en dessous.
+## Jeu concours via n8n (sans Google Sheet)
+Les inscriptions partent vers un webhook n8n qui **garde la liste lui-même** (dans la mémoire du workflow), comme pour les cotisations. S'inscrire deux fois avec la même adresse e-mail ne compte qu'une fois. Le site affiche le nombre d'inscrits en direct, mis à jour chaque minute.
+1. Dans n8n, importez `n8n/concours-workflow.json`. Dans **Vérifier la clé et répondre**, remplacez `CHANGEZ-MOI` par **la même clé secrète** que dans le workflow des cotisations. Dans **Confirmation au participant**, choisissez votre compte Gmail.
+2. **Save**, puis **Publish**. Copiez la **Production URL** du nœud « Inscription reçue » (elle finit par `/webhook/leclercq-concours`).
+3. Sur le site : **Espace liste → Jeu concours**, collez l'URL dans **Webhook d'inscription**, cochez **Inscriptions ouvertes**, puis **Enregistrer**.
+4. Ajoutez les lots (nom + photo) juste en dessous.
 
-⚠️ Le Sheet contient les e-mails des participants : partagez-le seulement avec les membres de la liste (jamais « Tous les utilisateurs disposant du lien »). Son adresse est visible dans `data.js`, mais elle ne donne aucun accès sans ce partage.
+Le tableau **Les inscrits** (même onglet) affiche nom, e-mail, téléphone et date. On peut y chercher, exporter en CSV, supprimer une ligne, cocher les gagnants, et **Tirer au sort** un gagnant parmi ceux qui n'ont pas encore gagné. Il utilise la clé secrète réglée dans l'onglet Cotisations.
 
-Le compteur utilise automatiquement la deuxième adresse du workflow (`…/leclercq-concours-compteur`), rien à régler. Pour le tirage au sort, ouvrez le Sheet et choisissez une ligne au hasard (par exemple `=INDEX(C2:C; ALEA.ENTRE.BORNES(1; NBVAL(C2:C)))`).
+Le compteur et le tableau utilisent automatiquement les autres adresses du workflow (`…/leclercq-concours-compteur` et `…/leclercq-concours-admin`), rien à régler.
 
 ## Cotisation et soutien actif via n8n (sans Google Sheet)
 Les déclarations du site partent vers un webhook n8n qui **garde la liste lui-même** (dans la mémoire du workflow) : pas de Google Sheet ni de dossier Drive. Tout se consulte dans l'Espace liste :

@@ -757,6 +757,7 @@
     btn.disabled = true; status.textContent = 'Inscription en cours…';
     try {
       const res = await postToWebhook(contest().webhook, payload);
+      if (res && res.ok === false) throw new Error(res.error || 'refus');
       if (typeof res.count === 'number') contestCount = res.count;
       storage.set(contestKey(), payload.email);
       form.reset(); status.textContent = '';
@@ -1053,6 +1054,7 @@
     $$('[data-panel]').forEach((p) => { p.hidden = p.dataset.panel !== tab; });
     if (tab === 'cotisations' || tab === 'soutien') loadAdhesions();
     if (tab === 'shop') loadOrders();
+    if (tab === 'contest') loadInscrits();
   }
   $('#admin-tabs').addEventListener('click', (e) => {
     const b = e.target.closest('[data-tab]'); if (b) goTab(b.dataset.tab);
@@ -1562,10 +1564,8 @@
     const f = $('#contest-admin-form');
     if (!f.contains(document.activeElement)) {
       f.open.checked = !!c.open;
-      ['title', 'desc', 'endsAt', 'rules', 'webhook', 'sheetUrl'].forEach((k) => { f[k].value = c[k] || ''; });
+      ['title', 'desc', 'endsAt', 'rules', 'webhook'].forEach((k) => { f[k].value = c[k] || ''; });
     }
-    const link = $('#contest-sheet-link');
-    link.hidden = !c.sheetUrl; link.href = c.sheetUrl || '#';
     $('#contest-admin-count').textContent = contestCount == null ? '—' : num(contestCount);
     $('#prizes-admin').innerHTML = (c.prizes || []).map((pr) => `
       <div class="edit-card">
@@ -1574,6 +1574,84 @@
         <div class="foot"><label class="btn btn-ghost btn-sm file-btn">${pr.photo ? 'Changer la photo' : 'Ajouter une photo'}<input type="file" accept="image/*" data-upload="prize" data-id="${pr.id}"></label>
           <button class="btn btn-danger btn-sm" type="button" data-del="prize" data-id="${pr.id}">Supprimer</button></div>
       </div>`).join('') || '<p class="faint">Aucun lot pour le moment.</p>';
+  }
+
+  // Jeu concours (Espace liste) : tableau des inscrits lu dans n8n (même clé secrète que les cotisations)
+  const concAdminUrl = () => (contest().webhook ? `${contest().webhook.replace(/\/+$/, '')}-admin` : '');
+  const conc = { loading: false, error: '', at: null, rows: [] };
+  async function concRequest(payload) {
+    if (!concAdminUrl()) throw new Error("Réglez d'abord le webhook d'inscription ci-dessus.");
+    if (!data.adhesionsKey) throw new Error("Réglez d'abord la clé secrète (onglet Cotisations).");
+    let res;
+    try { res = await postToWebhook(concAdminUrl(), { key: data.adhesionsKey, ...payload }); } catch { throw new Error('n8n injoignable. Vérifiez que le workflow est publié.'); }
+    if (!res || res.ok !== true) throw new Error(res && res.error === 'cle' ? 'Clé secrète refusée par n8n.' : 'Réponse inattendue de n8n.');
+    return res;
+  }
+  async function loadInscrits() {
+    if (!isAdmin || conc.loading) return;
+    if (!concAdminUrl() || !data.adhesionsKey) { conc.error = ''; renderInscrits(); return; }
+    conc.loading = true; renderInscrits();
+    try {
+      const res = await concRequest({ action: 'list' });
+      conc.rows = Array.isArray(res.inscrits) ? res.inscrits : [];
+      contestCount = conc.rows.length;
+      conc.error = ''; conc.at = new Date();
+    } catch (err) { conc.error = err.message; }
+    conc.loading = false; renderInscrits();
+  }
+  async function setWinner(id, value) {
+    const row = conc.rows.find((r) => String(r.id) === String(id));
+    if (!row) return;
+    const before = row.winner;
+    row.winner = value; renderInscrits();
+    try { await concRequest({ action: 'set', id: row.id, value: value ? 'Oui' : 'Non' }); }
+    catch (err) { row.winner = before; conc.error = err.message; renderInscrits(); }
+  }
+  async function deleteInscrit(id) {
+    const row = conc.rows.find((r) => String(r.id) === String(id));
+    if (!row || !confirm(`Supprimer ${row.name} des inscrits ?`)) return;
+    try {
+      await concRequest({ action: 'delete', id: row.id });
+      conc.rows = conc.rows.filter((r) => r !== row); contestCount = conc.rows.length; renderInscrits();
+    } catch (err) { conc.error = err.message; renderInscrits(); }
+  }
+  function drawWinner() {
+    const out = $('#conc-draw-result');
+    const pool = conc.rows.filter((r) => !r.winner);
+    if (!pool.length) { out.className = 'note err'; out.textContent = conc.rows.length ? 'Tout le monde a déjà gagné !' : 'Aucun inscrit pour le moment.'; return; }
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    if (!confirm(`Tiré au sort : ${pick.name} (${pick.email}). Le marquer comme gagnant ?`)) { out.className = 'note'; out.textContent = `Tiré au sort : ${pick.name}, non retenu.`; return; }
+    out.className = 'note'; out.textContent = `Gagnant : ${pick.name} · ${pick.email}${pick.phone ? ` · ${pick.phone}` : ''}`;
+    setWinner(pick.id, true);
+  }
+  function concCsv() {
+    const cols = [['Nom', 'name'], ['E-mail', 'email'], ['Téléphone', 'phone'], ['Date', 'date'], ['Gagnant', 'winner']];
+    const cell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const lines = conc.rows.map((r) => cols.map(([, k]) => cell(k === 'winner' ? (r.winner ? 'Oui' : 'Non') : r[k])).join(','));
+    download('inscrits-concours.csv', '\uFEFF' + [cols.map(([h]) => cell(h)).join(','), ...lines].join('\n'), 'text/csv');
+  }
+  function renderInscrits() {
+    if (!isAdmin || !$('#conc-table')) return;
+    const q = ($('#conc-search').value || '').trim().toLowerCase();
+    const rows = conc.rows
+      .filter((r) => !q || [r.name, r.email, r.phone].join(' ').toLowerCase().includes(q))
+      .sort((a, b) => Number(b.winner) - Number(a.winner) || String(a.name || '').localeCompare(String(b.name || ''), 'fr'));
+    const msg = !contest().webhook || !data.adhesionsKey ? "Réglez le webhook d'inscription et la clé secrète (onglet Cotisations) pour voir la liste."
+      : conc.loading && !conc.at ? 'Chargement…'
+        : conc.error ? esc(conc.error)
+          : conc.rows.length ? 'Aucun résultat.' : 'Personne pour le moment.';
+    $('#conc-table').innerHTML = `<thead><tr><th>Nom</th><th>E-mail</th><th>Téléphone</th><th>Date</th><th>Gagnant</th><th></th></tr></thead><tbody>${rows.length ? rows.map((r) => `
+      <tr>
+        <td><b>${esc(r.name)}</b></td><td><a href="mailto:${esc(r.email)}">${esc(r.email)}</a></td>
+        <td>${r.phone ? `<a href="tel:${esc(r.phone)}">${esc(r.phone)}</a>` : '<span class="faint">—</span>'}</td>
+        <td class="faint">${esc(r.date)}</td>
+        <td><label class="deliver"><input type="checkbox" data-winner="${esc(r.id)}" ${r.winner ? 'checked' : ''}> ${r.winner ? 'Gagnant' : '—'}</label></td>
+        <td class="num"><button class="btn btn-danger btn-sm" type="button" data-conc-del="${esc(r.id)}">Suppr.</button></td>
+      </tr>`).join('') : `<tr><td colspan="6" class="faint" style="text-align:center;padding:24px">${msg}</td></tr>`}</tbody>`;
+    const wins = conc.rows.filter((r) => r.winner).length;
+    const when = conc.loading ? 'Actualisation…' : conc.error && conc.at ? `<span style="color:var(--bad)">${esc(conc.error)}</span>` : conc.at ? `à jour à ${conc.at.toTimeString().slice(0, 5).replace(':', 'h')}` : '';
+    $('#conc-sum').innerHTML = `<b>${num(conc.rows.length)}</b> ${conc.rows.length > 1 ? 'inscrits' : 'inscrit'} · <b>${num(wins)}</b> ${wins > 1 ? 'gagnants' : 'gagnant'}${when ? ` · ${when}` : ''}`;
+    $('#contest-admin-count').textContent = contestCount == null ? '—' : num(contestCount);
   }
 
   // Cotisations et soutien actif (Espace liste) : tableaux lus dans n8n
@@ -1910,8 +1988,8 @@
     e.preventDefault();
     const f = e.target;
     data.contest = { ...contest(), open: f.open.checked, title: f.title.value.trim(), desc: f.desc.value.trim(), endsAt: f.endsAt.value,
-      rules: f.rules.value.trim(), webhook: f.webhook.value.trim(), sheetUrl: f.sheetUrl.value.trim() };
-    save(); refreshContestCount();
+      rules: f.rules.value.trim(), webhook: f.webhook.value.trim() };
+    save(); refreshContestCount(); conc.at = null; loadInscrits();
     $('#contest-admin-status').textContent = token() ? 'Enregistré et publié.' : 'Enregistré sur cet appareil.';
   });
   $('#contest-refresh').addEventListener('click', refreshContestCount);
@@ -1992,6 +2070,7 @@
   });
   ['#coti-search', '#soutien-search'].forEach((sel) => $(sel).addEventListener('input', renderAdhAdmin));
   $('#order-search').addEventListener('input', renderOrdersAdmin);
+  $('#conc-search').addEventListener('input', renderInscrits);
   function adhCsv(sheet) {
     const cols = sheet === 'cotisations'
       ? [['Prénom', 'firstName'], ['Nom', 'lastName'], ['Chambre', 'room'], ['Date', 'date'], ['Sac livré', 'done']]
@@ -2071,6 +2150,10 @@
     if (t.dataset.ordersCsv !== undefined) { ordersCsv(); return; }
     if (t.dataset.orderDel !== undefined) { deleteOrder(t.dataset.id); return; }
     if (t.dataset.ofilter) { ord.filter = t.dataset.ofilter; renderOrdersAdmin(); return; }
+    if (t.dataset.concRefresh !== undefined) { loadInscrits(); return; }
+    if (t.dataset.concCsv !== undefined) { concCsv(); return; }
+    if (t.dataset.concDraw !== undefined) { drawWinner(); return; }
+    if (t.dataset.concDel) { deleteInscrit(t.dataset.concDel); return; }
     if (t.dataset.adhCsv) { adhCsv(t.dataset.adhCsv); return; }
     if (t.dataset.proof) { showProof(t.dataset.proof, t.dataset.caption || 'Preuve de paiement'); return; }
     if (t.dataset.adhDel) { deleteAdh(t.dataset.adhDel, t.dataset.id); return; }
@@ -2153,6 +2236,7 @@
     }
     if (t.dataset.deliver) { setDelivered(t.dataset.deliver, t.dataset.id, t.checked); return; }
     if (t.dataset.orderDone !== undefined) { setOrderDone(t.dataset.id, t.checked); return; }
+    if (t.dataset.winner) { setWinner(t.dataset.winner, t.checked); return; }
     if (t.dataset.goodie) {
       const g = goodies().find((x) => x.id === t.dataset.goodie);
       g[t.dataset.field] = t.type === 'checkbox' ? t.checked : t.value.trim(); t.blur(); save(); return;
@@ -2313,6 +2397,7 @@
   setInterval(() => { if (!document.hidden) refreshContestCount(); }, 60000);
   setInterval(() => { if (isAdmin && !document.hidden && (currentTab === 'cotisations' || currentTab === 'soutien')) loadAdhesions(); }, 60000);
   setInterval(() => { if (isAdmin && !document.hidden && currentTab === 'shop') loadOrders(); }, 60000);
+  setInterval(() => { if (isAdmin && !document.hidden && currentTab === 'contest') loadInscrits(); }, 60000);
 
   renderAll();
   setView(view);

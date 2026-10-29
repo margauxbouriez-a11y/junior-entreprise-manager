@@ -440,8 +440,7 @@ window.JE_DATA = {
     "desc": "Inscrivez-vous en 30 secondes pour tenter de gagner les lots de la liste. Tirage au sort à la fin de la campagne.",
     "endsAt": "2026-11-14T20:00",
     "rules": "Jeu gratuit et sans obligation, réservé aux étudiants du campus HEC Paris. Une seule inscription par personne (adresse e-mail). Tirage au sort à la fin de la campagne ; le ou la gagnante est contacté·e par e-mail.",
-    "webhook": "",
-    "sheetUrl": "",
+    "webhook": "https://margauxbouriez2.app.n8n.cloud/webhook/leclercq-concours",
     "prizes": []
   },
   "cotisation": {
