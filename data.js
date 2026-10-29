@@ -18,7 +18,7 @@ window.JE_DATA = {
     "orderWebhook": "",
     "ordersOpen": true,
     "deliveryNote": "Livraison offerte en chambre ou au stand, sur le campus.",
-    "adhesionsWebhook": ""
+    "adhesionsWebhook": "https://margauxbouriez2.app.n8n.cloud/webhook/leclercq-adhesions"
   },
   "members": [
     {
