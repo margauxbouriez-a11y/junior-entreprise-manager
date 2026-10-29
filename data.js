@@ -15,7 +15,7 @@ window.JE_DATA = {
       "branch": "main",
       "path": "data.js"
     },
-    "orderWebhook": "https://margauxbouriez2.app.n8n.cloud/webhook/leclercq-adhesions",
+    "orderWebhook": "https://margauxbouriez2.app.n8n.cloud/webhook/leclercq-commandes",
     "ordersOpen": true,
     "deliveryNote": "Livraison offerte en chambre ou au stand, sur le campus.",
     "adhesionsWebhook": "https://margauxbouriez2.app.n8n.cloud/webhook/leclercq-adhesions",
