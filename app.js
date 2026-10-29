@@ -657,7 +657,7 @@
         <div class="done-badge">✓</div>
         <h4>Commande envoyée !</h4>
         <div class="order-no">${esc(id)}</div>
-        <p class="muted">Un membre de la liste vous livre ${esc(payload.where)} (${esc(payload.when.toLowerCase())}).${payload.email ? ' Un récapitulatif part par e-mail.' : ''}</p>
+        <p class="muted">Un membre de la liste vous livre ${esc(payload.where)} (${esc(payload.when.toLowerCase())}). Gardez votre numéro de commande.</p>
         <div class="done-recap">${lines.map((l) => `<div class="cart-line" style="grid-template-columns:1fr auto"><b>${esc(l.prod.name)}</b><span>× ${l.qty}</span></div>`).join('')}</div>
         <button class="btn btn-ghost" type="button" data-close-cart>Fermer</button>
       </div>`;
@@ -679,7 +679,8 @@
     btn.disabled = true;
     status.textContent = 'Envoi de la commande…';
     try {
-      await postToWebhook(hook, payload);
+      const res = await postToWebhook(hook, payload);
+      if (res && res.ok === false) throw new Error(res.error || 'refus');
       done();
     } catch {
       status.className = 'note err';
@@ -1051,6 +1052,7 @@
     $$('#admin-tabs button').forEach((x) => x.classList.toggle('on', x.dataset.tab === tab));
     $$('[data-panel]').forEach((p) => { p.hidden = p.dataset.panel !== tab; });
     if (tab === 'cotisations' || tab === 'soutien') loadAdhesions();
+    if (tab === 'shop') loadOrders();
   }
   $('#admin-tabs').addEventListener('click', (e) => {
     const b = e.target.closest('[data-tab]'); if (b) goTab(b.dataset.tab);
@@ -1680,6 +1682,89 @@
     $$('#coti-filter [data-afilter]').forEach((b) => b.classList.toggle('on', b.dataset.afilter === adh.filter.cotisations));
     $$('#soutien-filter [data-afilter]').forEach((b) => b.classList.toggle('on', b.dataset.afilter === adh.filter.soutien));
   }
+  // Commandes de la boutique (Espace liste) : tableau lu dans n8n, comme les cotisations.
+  // Même clé secrète que les cotisations ; adresse = webhook des commandes suivi de « -admin ».
+  const orderAdminUrl = () => {
+    const u = String(data.config.orderWebhook || '').trim();
+    return u ? `${u.replace(/\/+$/, '')}-admin` : '';
+  };
+  const ord = { loading: false, error: '', at: null, rows: [], filter: 'todo' };
+  async function ordRequest(payload) {
+    if (!orderAdminUrl()) throw new Error("Réglez d'abord le webhook des commandes (ci-dessus).");
+    if (!data.adhesionsKey) throw new Error("Réglez d'abord la clé secrète (onglet Cotisations → Connexion n8n).");
+    let res;
+    try { res = await postToWebhook(orderAdminUrl(), { key: data.adhesionsKey, ...payload }); } catch { throw new Error('n8n injoignable. Vérifiez que le workflow « Commandes du site » est publié.'); }
+    if (!res || res.ok !== true) throw new Error(res && res.error === 'cle' ? 'Clé secrète refusée par n8n.' : 'Réponse inattendue de n8n.');
+    return res;
+  }
+  async function loadOrders() {
+    if (!isAdmin || ord.loading) return;
+    if (!orderAdminUrl() || !data.adhesionsKey) { ord.error = ''; renderOrdersAdmin(); return; }
+    ord.loading = true; renderOrdersAdmin();
+    try {
+      const res = await ordRequest({ action: 'list' });
+      ord.rows = Array.isArray(res.commandes) ? res.commandes : [];
+      ord.error = ''; ord.at = new Date();
+    } catch (err) { ord.error = err.message; }
+    ord.loading = false; renderOrdersAdmin();
+  }
+  async function setOrderDone(id, value) {
+    const row = ord.rows.find((r) => String(r.id) === String(id));
+    if (!row) return;
+    const before = row.done;
+    row.done = value; renderOrdersAdmin();
+    try { await ordRequest({ action: 'set', id: row.id, value: value ? 'Oui' : 'Non' }); }
+    catch (err) { row.done = before; ord.error = err.message; renderOrdersAdmin(); }
+  }
+  async function deleteOrder(id) {
+    const row = ord.rows.find((r) => String(r.id) === String(id));
+    if (!row || !confirm(`Supprimer la commande ${row.id} (${row.name}) ?`)) return;
+    try {
+      await ordRequest({ action: 'delete', id: row.id });
+      ord.rows = ord.rows.filter((r) => r !== row); renderOrdersAdmin();
+    } catch (err) { ord.error = err.message; renderOrdersAdmin(); }
+  }
+  function orderRows() {
+    const q = ($('#order-search').value || '').trim().toLowerCase();
+    const indexed = ord.rows.map((r, i) => ({ r, i }));
+    return indexed
+      .filter(({ r }) => (ord.filter === 'todo' ? !r.done : ord.filter === 'done' ? r.done : true))
+      .filter(({ r }) => !q || [r.id, r.name, r.where, r.when, r.articles, r.phone, r.email, r.notes].join(' ').toLowerCase().includes(q))
+      // À livrer : la plus ancienne en premier. Livrées : la plus récente en premier.
+      .sort((a, b) => Number(a.r.done) - Number(b.r.done) || (a.r.done ? b.i - a.i : a.i - b.i))
+      .map(({ r }) => r);
+  }
+  function renderOrdersAdmin() {
+    if (!isAdmin) return;
+    const rows = orderRows();
+    const empty = !orderAdminUrl() || !data.adhesionsKey ? 'Réglez le webhook des commandes et la clé secrète (onglet Cotisations) pour voir les commandes.'
+      : ord.loading && !ord.at ? 'Chargement…'
+        : ord.error ? esc(ord.error)
+          : ord.rows.length ? (ord.filter === 'todo' ? 'Tout est livré.' : 'Aucun résultat.') : 'Aucune commande pour le moment.';
+    const tel = (p) => String(p || '').replace(/[^\d+]/g, '');
+    $('#orders-table').innerHTML = `<thead><tr><th>N°</th><th>Reçue</th><th>Nom</th><th>Articles</th><th>Où · quand</th><th>Contact</th><th>Précisions</th><th>Livrée</th><th></th></tr></thead><tbody>${rows.length ? rows.map((r) => `
+      <tr class="${r.done ? 'is-done' : ''}">
+        <td style="white-space:nowrap"><b>${esc(r.id)}</b></td>
+        <td class="faint" style="white-space:nowrap">${esc(r.date)}</td>
+        <td><b>${esc(r.name)}</b></td>
+        <td>${esc(r.articles)}${r.count ? ` <span class="faint">(${esc(r.count)})</span>` : ''}</td>
+        <td>${esc(r.where)}<br><span class="faint">${esc(r.when)}</span></td>
+        <td>${r.phone ? `<a href="tel:${esc(tel(r.phone))}">${esc(r.phone)}</a>` : ''}${r.phone && r.email ? '<br>' : ''}${r.email ? `<a href="mailto:${esc(r.email)}">${esc(r.email)}</a>` : ''}${!r.phone && !r.email ? '<span class="faint">—</span>' : ''}</td>
+        <td>${r.notes ? esc(r.notes) : '<span class="faint">—</span>'}</td>
+        <td><label class="deliver"><input type="checkbox" data-order-done data-id="${esc(r.id)}" ${r.done ? 'checked' : ''}> ${r.done ? 'Livrée' : 'À livrer'}</label></td>
+        <td class="num"><button class="btn btn-danger btn-sm" type="button" data-order-del data-id="${esc(r.id)}">Suppr.</button></td>
+      </tr>`).join('') : `<tr><td colspan="9" class="faint" style="text-align:center;padding:24px">${empty}</td></tr>`}</tbody>`;
+    const todo = ord.rows.filter((r) => !r.done).length;
+    const when = ord.loading ? 'Actualisation…' : ord.error && ord.at ? `<span style="color:var(--bad)">${esc(ord.error)}</span>` : ord.at ? `à jour à ${ord.at.toTimeString().slice(0, 5).replace(':', 'h')}` : '';
+    $('#orders-sum').innerHTML = `<b>${num(ord.rows.length)}</b> commande${ord.rows.length > 1 ? 's' : ''} · <b>${num(todo)}</b> à livrer${when ? ` · ${when}` : ''}`;
+    $$('#order-filter [data-ofilter]').forEach((b) => b.classList.toggle('on', b.dataset.ofilter === ord.filter));
+  }
+  function ordersCsv() {
+    const cols = [['N°', 'id'], ['Reçue', 'date'], ['Nom', 'name'], ['Articles', 'articles'], ['Nb', 'count'], ['Où', 'where'], ['Quand', 'when'], ['Téléphone', 'phone'], ['E-mail', 'email'], ['Précisions', 'notes'], ['Livrée', 'done']];
+    const cell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const lines = ord.rows.map((r) => cols.map(([, k]) => cell(k === 'done' ? (r.done ? 'Oui' : 'Non') : r[k])).join(','));
+    download('commandes.csv', '﻿' + [cols.map(([h]) => cell(h)).join(','), ...lines].join('\n'), 'text/csv');
+  }
   function renderCotiAdmin() {
     const c = cotisation();
     const f = $('#coti-admin-form');
@@ -1757,7 +1842,7 @@
     // Ne pas écraser un champ en cours de saisie
     const active = document.activeElement;
     if (active && active.matches('#admin-app [data-member], #admin-app [data-qty], #admin-app [data-food], #admin-app [data-product], #admin-app [data-partner], #admin-app [data-prize], #admin-app [data-goodie], #admin-app [data-perk], #admin-app [data-menu], #admin-app [data-ing]')) return;
-    renderKpis(); renderOverview(); renderBudget(); renderStock(); renderMenus(); renderEmails(); renderFoodAdmin(); renderShopAdmin(); renderCotiAdmin(); renderSoutienAdmin(); renderAdhAdmin(); renderContestAdmin(); renderPartnersAdmin(); renderEventsAdmin(); renderMembersAdmin(); renderSettings();
+    renderKpis(); renderOverview(); renderBudget(); renderStock(); renderMenus(); renderEmails(); renderFoodAdmin(); renderShopAdmin(); renderOrdersAdmin(); renderCotiAdmin(); renderSoutienAdmin(); renderAdhAdmin(); renderContestAdmin(); renderPartnersAdmin(); renderEventsAdmin(); renderMembersAdmin(); renderSettings();
   }
 
   function renderPublic() {
@@ -1906,6 +1991,7 @@
     btn.disabled = false;
   });
   ['#coti-search', '#soutien-search'].forEach((sel) => $(sel).addEventListener('input', renderAdhAdmin));
+  $('#order-search').addEventListener('input', renderOrdersAdmin);
   function adhCsv(sheet) {
     const cols = sheet === 'cotisations'
       ? [['Prénom', 'firstName'], ['Nom', 'lastName'], ['Chambre', 'room'], ['Date', 'date'], ['Sac livré', 'done']]
@@ -1981,6 +2067,10 @@
       return;
     }
     if (t.dataset.adhRefresh !== undefined) { loadAdhesions(); return; }
+    if (t.dataset.ordersRefresh !== undefined) { loadOrders(); return; }
+    if (t.dataset.ordersCsv !== undefined) { ordersCsv(); return; }
+    if (t.dataset.orderDel !== undefined) { deleteOrder(t.dataset.id); return; }
+    if (t.dataset.ofilter) { ord.filter = t.dataset.ofilter; renderOrdersAdmin(); return; }
     if (t.dataset.adhCsv) { adhCsv(t.dataset.adhCsv); return; }
     if (t.dataset.proof) { showProof(t.dataset.proof, t.dataset.caption || 'Preuve de paiement'); return; }
     if (t.dataset.adhDel) { deleteAdh(t.dataset.adhDel, t.dataset.id); return; }
@@ -2062,6 +2152,7 @@
       return;
     }
     if (t.dataset.deliver) { setDelivered(t.dataset.deliver, t.dataset.id, t.checked); return; }
+    if (t.dataset.orderDone !== undefined) { setOrderDone(t.dataset.id, t.checked); return; }
     if (t.dataset.goodie) {
       const g = goodies().find((x) => x.id === t.dataset.goodie);
       g[t.dataset.field] = t.type === 'checkbox' ? t.checked : t.value.trim(); t.blur(); save(); return;
@@ -2096,6 +2187,7 @@
     data.config = { ...data.config, ordersOpen: f.ordersOpen.checked, orderWebhook: f.orderWebhook.value.trim(), deliveryNote: f.deliveryNote.value.trim(), shopIntro: f.shopIntro.value.trim() };
     save();
     $('#shop-status').textContent = token() ? 'Enregistré et publié.' : 'Enregistré sur cet appareil.';
+    ord.at = null; loadOrders();
   });
   $('#product-form').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -2220,6 +2312,7 @@
   refreshContestCount();
   setInterval(() => { if (!document.hidden) refreshContestCount(); }, 60000);
   setInterval(() => { if (isAdmin && !document.hidden && (currentTab === 'cotisations' || currentTab === 'soutien')) loadAdhesions(); }, 60000);
+  setInterval(() => { if (isAdmin && !document.hidden && currentTab === 'shop') loadOrders(); }, 60000);
 
   renderAll();
   setView(view);

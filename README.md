@@ -35,7 +35,7 @@ Code d'accès par défaut : `leclercq2026` (modifiable dans Réglages). Il chiff
   - Les menus sont dans la partie privée (chiffrée) de `data.js`, comme les stocks, et se publient automatiquement.
 - **Où sont les membres** : une carte par membre ; un clic pour changer de statut (Disponible, Occupé·e, En pause, Absent·e), un champ pour la position (avec suggestions des lieux connus), et l'heure de la dernière mise à jour.
 - **Budget** : recettes et dépenses, solde, plafond, dépenses par poste.
-- **Boutique** : catalogue des articles offerts, limite par commande, disponibilité, ouverture ou fermeture de la boutique.
+- **Boutique** : le tableau des **commandes** reçues (case **Livrée**, recherche, filtres, export CSV), le catalogue des articles offerts, limite par commande, disponibilité, ouverture ou fermeture de la boutique.
 - **Cotisations** : le tableau de tous les cotisants (prénom, nom, chambre, photo de preuve à ouvrir en grand) avec une case **Sac livré** à cocher, une recherche, un filtre « Sac à livrer » et un export CSV. On y modifie aussi ce que gagnent les cotisants (nom, description, photo) et la connexion n8n.
 - **Soutien actif** : le tableau des demandes (prénom, nom, goodies voulus) avec une case **Donné** à cocher, le total demandé / donné pour chaque goodie, et la gestion des goodies proposés (nom, description, photos, disponible ou épuisé).
 - **Jeu concours** : titre, texte, date de fin, règlement, ouverture des inscriptions, lots avec photo, et nombre d'inscrits en direct.
@@ -63,22 +63,19 @@ Sans clé, les modifications restent sur l'appareil ; le bouton **Exporter data.
 **Données privées :** dans `data.js`, le budget, les stocks, les abonnés et les campagnes e-mail sont **chiffrés avec le code d'accès** de l'Espace liste (`leclercq2026` par défaut, à changer dans Réglages, 8 caractères minimum). Sans le code, ces données sont illisibles, même en ouvrant le fichier. Si vous changez le code, prévenez tous les membres. Si vous le perdez, la partie privée est perdue.
 
 ## Boutique : commandes offertes (boissons, crêpes, ménage…) via n8n
-Dans la section **Commander**, les étudiants ajoutent des articles à leur commande, en respectant une limite par article (par exemple 2 Red Bull au maximum), puis indiquent où les livrer et valident. **Tout est offert, il n'y a aucun paiement.** Chaque commande reçoit un numéro (`LQ-1015-4821`) et part vers un webhook n8n, qui :
-- envoie un mail à la liste avec le détail. Pour écrire à l'étudiant, il suffit de répondre à ce mail ;
-- envoie un récapitulatif à l'étudiant.
+Dans la section **Commander**, les étudiants ajoutent des articles à leur commande, en respectant une limite par article (par exemple 2 Red Bull au maximum), puis indiquent où les livrer et valident. **Tout est offert, il n'y a aucun paiement.** Chaque commande reçoit un numéro (`LQ-1015-4821`) et part vers un webhook n8n qui **la garde lui-même** (dans la mémoire du workflow). **Aucun e-mail n'est envoyé**, ni à la liste ni à l'étudiant.
+
+**Voir et livrer les commandes :** Espace liste → onglet **Boutique** → tableau **Les commandes** : numéro, heure, nom, articles, lieu et créneau, téléphone (cliquable pour appeler), précisions, case **Livrée** à cocher, recherche, filtres « À livrer / Livrées / Toutes », bouton pour supprimer une ligne et **Exporter CSV**. Le tableau s'actualise chaque minute. Il utilise la **même clé secrète** que les cotisations (Espace liste → Cotisations → Connexion n8n).
 
 **Gérer les propositions :** Espace liste → onglet **Boutique**. Chaque proposition est une carte modifiable : nom, catégorie, description, maximum par commande, « Disponible » (sinon elle apparaît « Épuisé »), ordre d'affichage (↑ ↓), et **photos** de ce que les gens commandent (la première sert de vignette sur la boutique, les autres se voient en cliquant dessus). On peut aussi ouvrir ou fermer toute la boutique et modifier le texte d'introduction.
 
-**Brancher n8n :**
+**Brancher n8n (déjà fait pour la campagne actuelle) :**
 1. Dans n8n : **Create workflow → ⋯ → Import from File**, puis choisissez `n8n/commandes-workflow.json`.
-2. Dans **Mail à la liste** et **Récapitulatif à l'étudiant**, choisissez votre compte Gmail. Remplacez `ADRESSE-DE-LA-LISTE@gmail.com` par les adresses qui doivent recevoir les commandes (plusieurs possibles, séparées par des virgules, adresses HEC comprises).
-3. **Save**, puis **Publish**. Copiez la **Production URL** du nœud « Commande reçue ».
+2. Ouvrez le nœud **Vérifier la clé et répondre** et remplacez `CHANGEZ-MOI` par la même clé secrète que pour les cotisations.
+3. **Save**, puis **Publish**. Copiez la **Production URL** du nœud « Commande reçue » (elle finit par `/webhook/leclercq-commandes`, et non `leclercq-adhesions`).
 4. Sur le site : **Espace liste → Boutique → Webhook des commandes**, collez l'URL, puis **Enregistrer**.
 
-**Google Sheet des commandes (une ligne par commande, avec une colonne Fait / Pas fait) :**
-1. Créez un Google Sheet. Renommez le premier onglet `Commandes`, puis **Fichier → Importer** `n8n/modele-commandes.csv` en choisissant « Remplacer la feuille actuelle ». Vous obtenez les colonnes : Date, N° commande, **Statut**, Nom, E-mail, Téléphone, Lieu de livraison, Créneau, Articles, Nb d'articles, Précisions.
-2. Sélectionnez la colonne **Statut**, puis **Insertion → Menu déroulant** avec les options `Fait` (vert) et `Pas fait` (rouge). Chaque nouvelle commande arrive en « Pas fait » ; la liste passe la ligne en « Fait » une fois livrée.
-3. Dans n8n, ouvrez le nœud **Ajouter au Google Sheet** : choisissez votre compte Google (Credential « Google Sheets OAuth2 »), puis remplacez `COLLEZ-ICI-L-URL-DU-GOOGLE-SHEET` par l'adresse du Sheet. **Save**.
+⚠️ Comme pour les cotisations, la liste vit dans le workflow : ne le supprimez pas et ne le réimportez pas par-dessus. Les essais avec « Test workflow » ne sont pas enregistrés. Pensez à faire **Exporter CSV** de temps en temps.
 
 Tant qu'aucun webhook n'est réglé, la commande ouvre la messagerie de l'étudiant vers l'e-mail de contact de la liste. Sans e-mail de contact non plus, le site indique que les commandes ne sont pas encore ouvertes.
 

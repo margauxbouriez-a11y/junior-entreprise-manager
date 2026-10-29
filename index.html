@@ -842,7 +842,7 @@
           <form id="order-form" novalidate>
             <h4 class="drawer-sub">Vos coordonnées</h4>
             <label class="field"><span>Prénom et nom</span><input name="name" required autocomplete="name"></label>
-            <label class="field"><span>E-mail</span><input name="email" type="email" required autocomplete="email" placeholder="prenom.nom@hec.edu"></label>
+            <label class="field"><span>E-mail <em>(facultatif)</em></span><input name="email" type="email" autocomplete="email" placeholder="prenom.nom@hec.edu"></label>
             <label class="field"><span>Téléphone</span><input name="phone" type="tel" required autocomplete="tel"></label>
             <label class="field"><span>Où vous livrer ?</span><input name="where" required placeholder="Chambre 214, bâtiment…"></label>
             <label class="field"><span>Quand ?</span><input name="when" placeholder="Dès que possible"></label>
@@ -1172,10 +1172,19 @@
         </form>
         <div class="card panel">
           <h3>Comment arrivent les commandes ?</h3>
-          <p class="muted" style="margin-top:0">Chaque commande part vers le webhook n8n, qui envoie un mail à la liste (avec le numéro de commande et le détail) et un récapitulatif à l'étudiant. Le workflow prêt à importer est dans <code>n8n/commandes-workflow.json</code>.</p>
+          <p class="muted" style="margin-top:0">Chaque commande part vers le webhook n8n, qui la garde (aucun e-mail n'est envoyé). Elles s'affichent dans le tableau « Les commandes » ci-dessous, avec la même clé secrète que les cotisations. Le workflow est dans <code>n8n/commandes-workflow.json</code>.</p>
           <p class="muted">Pour suspendre une proposition (rupture, stand fermé), décochez « Disponible » : elle apparaît « Épuisé » sur le site. Les flèches ↑ ↓ changent l'ordre d'affichage.</p>
         </div>
       </div>
+      <h3 class="sub-head">Les commandes</h3>
+      <div class="adh-tools">
+        <input type="search" id="order-search" placeholder="Rechercher un nom, un lieu, un n°…" aria-label="Rechercher une commande">
+        <div class="seg" id="order-filter"><button type="button" data-ofilter="todo" class="on">À livrer</button><button type="button" data-ofilter="done">Livrées</button><button type="button" data-ofilter="all">Toutes</button></div>
+        <button class="btn btn-ghost btn-sm" type="button" data-orders-refresh>Actualiser</button>
+        <button class="btn btn-ghost btn-sm" type="button" data-orders-csv>Exporter CSV</button>
+        <span class="adh-sum" id="orders-sum"></span>
+      </div>
+      <div class="table-wrap"><table id="orders-table"></table></div>
       <h3 class="sub-head">Les propositions</h3>
       <p class="muted" style="margin:-4px 0 14px">Chaque champ est enregistré dès que vous quittez la case. Ajoutez des photos de ce que les gens commandent : elles s'affichent sur la carte de la boutique.</p>
       <div class="admin-cards" id="products-admin"></div>
