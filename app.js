@@ -18,7 +18,7 @@
 
   // ---------- Données publiques / privées ----------
   // data.js contient la partie publique en clair (programme, food, équipe…) et la
-  // partie privée (budget, stocks, abonnés, campagnes) chiffrée avec le code
+  // partie privée (stocks, abonnés, campagnes ; « budget » est gardé pour les anciennes données) chiffrée avec le code
   // d'accès de la liste : seuls les membres qui ont le code peuvent la lire.
   const PRIVATE_KEYS = ['budget', 'budgetCap', 'stock', 'menus', 'subscribers', 'campaigns', 'adhesionsKey'];
   const PRIVATE_DEFAULTS = { budget: [], budgetCap: 0, stock: [], menus: [], subscribers: [], campaigns: [], adhesionsKey: '' };
@@ -1060,20 +1060,11 @@
     const b = e.target.closest('[data-tab]'); if (b) goTab(b.dataset.tab);
   });
 
-  function budgetTotals() {
-    const rec = data.budget.filter((b) => b.type === 'recette').reduce((s, b) => s + Number(b.amount), 0);
-    const dep = data.budget.filter((b) => b.type === 'depense').reduce((s, b) => s + Number(b.amount), 0);
-    return { rec, dep, solde: rec - dep };
-  }
   const lowStock = () => data.stock.filter((s) => Number(s.quantity) <= Number(s.threshold));
 
   function renderKpis() {
-    const t = budgetTotals();
     const low = lowStock().length;
-    const cap = Number(data.budgetCap) || 0;
     const kpis = [
-      ['Solde', euro(t.solde), t.solde < 0],
-      ['Dépensé', `${euro(t.dep)}${cap ? ` / ${euro(cap)}` : ''}`, cap && t.dep > cap],
       ['Produits à racheter', low, low > 0],
       ['Abonnés e-mail', data.subscribers.length, false],
     ];
@@ -1108,23 +1099,6 @@
   }
 
   function delBtn(kind, id) { return `<button class="btn btn-danger btn-sm" data-del="${kind}" data-id="${esc(id)}" type="button">Suppr.</button>`; }
-
-  function renderBudget() {
-    const t = budgetTotals();
-    const cats = {};
-    data.budget.filter((b) => b.type === 'depense').forEach((b) => { cats[b.category] = (cats[b.category] || 0) + Number(b.amount); });
-    const max = Math.max(1, ...Object.values(cats));
-    $('#budget-bars').innerHTML = Object.keys(cats).length
-      ? Object.entries(cats).sort((a, b) => b[1] - a[1]).map(([c, v]) =>
-        `<div class="bar-row"><span>${esc(c)}</span><div class="gauge"><span style="width:${(v / max) * 100}%"></span></div><span class="num">${euro(v)}</span></div>`).join('')
-        + `<p class="faint" style="margin-top:10px">Recettes ${euro(t.rec)} · Dépenses ${euro(t.dep)} · Solde ${euro(t.solde)}</p>`
-      : '<p class="muted">Aucune dépense pour le moment.</p>';
-    $('#budget-cats').innerHTML = [...new Set(data.budget.map((b) => b.category))].map((c) => `<option>${esc(c)}</option>`).join('');
-    const rows = [...data.budget].sort((a, b) => b.date.localeCompare(a.date));
-    $('#budget-table').innerHTML = '<tr><th>Date</th><th>Libellé</th><th>Poste</th><th class="num">Montant</th><th></th></tr>' + rows.map((b) =>
-      `<tr><td>${esc(fmtShort(b.date))}</td><td>${esc(b.label)}</td><td>${esc(b.category)}</td>
-        <td class="num" style="color:var(${b.type === 'recette' ? '--ok' : '--ink'})">${b.type === 'recette' ? '+' : '−'} ${euro(b.amount)}</td><td class="num">${delBtn('budget', b.id)}</td></tr>`).join('');
-  }
 
   // ---------- Stocks food ----------
   function stockState(st) {
@@ -1912,7 +1886,6 @@
     $('#github-repo').textContent = `${r.owner}/${r.repo}`;
     $('#github-state').textContent = token() ? 'Activée sur cet appareil.' : 'Désactivée sur cet appareil.';
     $('#github-off').hidden = !token();
-    f.budgetCap.value = data.budgetCap ?? '';
   }
 
   function renderAdmin() {
@@ -1920,7 +1893,7 @@
     // Ne pas écraser un champ en cours de saisie
     const active = document.activeElement;
     if (active && active.matches('#admin-app [data-member], #admin-app [data-qty], #admin-app [data-food], #admin-app [data-product], #admin-app [data-partner], #admin-app [data-prize], #admin-app [data-goodie], #admin-app [data-perk], #admin-app [data-menu], #admin-app [data-ing]')) return;
-    renderKpis(); renderOverview(); renderBudget(); renderStock(); renderMenus(); renderEmails(); renderFoodAdmin(); renderShopAdmin(); renderOrdersAdmin(); renderCotiAdmin(); renderSoutienAdmin(); renderAdhAdmin(); renderContestAdmin(); renderPartnersAdmin(); renderEventsAdmin(); renderMembersAdmin(); renderSettings();
+    renderKpis(); renderOverview(); renderStock(); renderMenus(); renderEmails(); renderFoodAdmin(); renderShopAdmin(); renderOrdersAdmin(); renderCotiAdmin(); renderSoutienAdmin(); renderAdhAdmin(); renderContestAdmin(); renderPartnersAdmin(); renderEventsAdmin(); renderMembersAdmin(); renderSettings();
   }
 
   function renderPublic() {
@@ -1930,14 +1903,6 @@
 
   // ---------- Actions de l'espace liste ----------
   const formData = (form) => Object.fromEntries(new FormData(form).entries());
-
-  $('#budget-form').addEventListener('submit', (e) => {
-    e.preventDefault();
-    const d = formData(e.target);
-    data.budget.push({ id: uid('b'), ...d, amount: Number(d.amount) });
-    e.target.reset(); e.target.date.value = todayIso; save();
-  });
-  $('#budget-form').date.value = todayIso;
 
   $('#stock-form').addEventListener('submit', (e) => {
     e.preventDefault();
@@ -2176,7 +2141,7 @@
       const m = findIn('members', t.dataset.id); m.status = t.dataset.mstatus; m.updatedAt = new Date().toISOString(); save(); return;
     }
     if (t.dataset.del) {
-      const map = { budget: 'budget', stock: 'stock', food: 'food', event: 'events', member: 'members', campaign: 'campaigns', product: 'products' };
+      const map = { stock: 'stock', food: 'food', event: 'events', member: 'members', campaign: 'campaigns', product: 'products' };
       if (!confirm('Supprimer cet élément ?')) return;
       if (t.dataset.del === 'sub') data.subscribers = data.subscribers.filter((s) => s.email !== t.dataset.id);
       else data[map[t.dataset.del]] = data[map[t.dataset.del]].filter((x) => x.id !== t.dataset.id);
@@ -2297,7 +2262,6 @@
       crypt = { key: await deriveKey(newCode, salt), salt, code: newCode };
       try { sessionStorage.setItem(SESSION_KEY, newCode); } catch { /* ignore */ }
     }
-    data.budgetCap = Number(d.budgetCap) || 0; delete d.budgetCap;
     data.config = { ...data.config, ...d, campaignDays: Number(d.campaignDays) };
     selectedDay = null; save();
     $('#settings-status').textContent = token() ? 'Réglages enregistrés et publiés.' : 'Réglages enregistrés sur cet appareil.';
