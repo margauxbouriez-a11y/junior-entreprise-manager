@@ -6,7 +6,7 @@ Site statique : aucun serveur ni installation. Ouvrez `index.html` dans un navig
 Adresse une fois publiée : https://margauxbouriez-a11y.github.io/junior-entreprise-manager/
 
 ## Fichiers
-- `data.js` — le contenu du site. Il est mis à jour automatiquement depuis l'Espace liste (voir plus bas). La partie publique (programme, food, équipe…) est lisible ; la partie privée (budget, stocks, menus, abonnés) est chiffrée.
+- `data.js` — le contenu du site. Il est mis à jour automatiquement depuis l'Espace liste (voir plus bas). La partie publique (programme, food, équipe…) est lisible ; la partie privée (stocks, menus, abonnés) est chiffrée.
 - `index.html` — la mise en page et les textes fixes.
 - `app.js` — le fonctionnement.
 
@@ -34,7 +34,6 @@ Code d'accès par défaut : `leclercq2026` (modifiable dans Réglages). Il chiff
   - Le tableau « Ingrédients nécessaires » et la liste de courses de « Stocks food » ajoutent ce qu'il faut acheter pour les menus ; chaque carte de stock affiche la quantité prévue dans les menus.
   - Les menus sont dans la partie privée (chiffrée) de `data.js`, comme les stocks, et se publient automatiquement.
 - **Où sont les membres** : une carte par membre ; un clic pour changer de statut (Disponible, Occupé·e, En pause, Absent·e), un champ pour la position (avec suggestions des lieux connus), et l'heure de la dernière mise à jour.
-- **Budget** : recettes et dépenses, solde, plafond, dépenses par poste.
 - **Boutique** : le tableau des **commandes** reçues (case **Livrée**, recherche, filtres, export CSV), le catalogue des articles offerts, limite par commande, disponibilité, ouverture ou fermeture de la boutique.
 - **Cotisations** : le tableau de tous les cotisants (prénom, nom, chambre, photo de preuve à ouvrir en grand) avec une case **Sac livré** à cocher, une recherche, un filtre « Sac à livrer » et un export CSV. On y modifie aussi ce que gagnent les cotisants (nom, description, photo) et la connexion n8n.
 - **Soutien actif** : le tableau des demandes (prénom, nom, goodies voulus) avec une case **Donné** à cocher, le total demandé / donné pour chaque goodie, et la gestion des goodies proposés (nom, description, photos, disponible ou épuisé).
@@ -46,7 +45,7 @@ Code d'accès par défaut : `leclercq2026` (modifiable dans Réglages). Il chiff
 **Photos :** elles sont réduites automatiquement (1400 px), puis enregistrées dans le dépôt (`assets/uploads/`) grâce à la clé GitHub de la publication automatique. Elles apparaissent en ligne environ une minute plus tard. Sans clé, elles restent enregistrées sur l'appareil seulement.
 
 ## Publier les modifications (publication automatique)
-Depuis l'Espace liste, chaque modification (événements, stands food, membres, stocks, budget…) peut être **mise en ligne automatiquement** pour tout le monde, en une minute environ. Les écrans publics déjà ouverts se mettent à jour tout seuls toutes les 90 secondes.
+Depuis l'Espace liste, chaque modification (événements, stands food, membres, stocks…) peut être **mise en ligne automatiquement** pour tout le monde, en une minute environ. Les écrans publics déjà ouverts se mettent à jour tout seuls toutes les 90 secondes.
 
 **À faire une fois :**
 1. Sur GitHub : **Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token**.
@@ -60,7 +59,7 @@ Depuis l'Espace liste, chaque modification (événements, stands food, membres, 
 Si deux membres modifient en même temps, leurs changements sont fusionnés automatiquement.
 Sans clé, les modifications restent sur l'appareil ; le bouton **Exporter data.js** permet alors de publier à la main (remplacer `data.js` sur GitHub).
 
-**Données privées :** dans `data.js`, le budget, les stocks, les abonnés et les campagnes e-mail sont **chiffrés avec le code d'accès** de l'Espace liste (`leclercq2026` par défaut, à changer dans Réglages, 8 caractères minimum). Sans le code, ces données sont illisibles, même en ouvrant le fichier. Si vous changez le code, prévenez tous les membres. Si vous le perdez, la partie privée est perdue.
+**Données privées :** dans `data.js`, les stocks, les abonnés et les campagnes e-mail sont **chiffrés avec le code d'accès** de l'Espace liste (`leclercq2026` par défaut, à changer dans Réglages, 8 caractères minimum). Sans le code, ces données sont illisibles, même en ouvrant le fichier. Si vous changez le code, prévenez tous les membres. Si vous le perdez, la partie privée est perdue.
 
 ## Boutique : commandes offertes (boissons, crêpes, ménage…) via n8n
 Dans la section **Commander**, les étudiants ajoutent des articles à leur commande, en respectant une limite par article (par exemple 2 Red Bull au maximum), puis indiquent où les livrer et valident. **Tout est offert, il n'y a aucun paiement.** Chaque commande reçoit un numéro (`LQ-1015-4821`) et part vers un webhook n8n qui **la garde lui-même** (dans la mémoire du workflow). **Aucun e-mail n'est envoyé**, ni à la liste ni à l'étudiant.

@@ -325,7 +325,7 @@
   .banner.ok { border-color: rgba(94, 240, 176, .45); }
   .banner.warn { border-color: rgba(255, 193, 92, .5); background: var(--warn-soft); }
   .banner code, .gh-steps code { background: var(--surface-2); padding: 1px 6px; border-radius: 4px; font-size: 12px; }
-  .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 28px; }
+  .kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 28px; }
   .kpi { padding: 16px 18px; }
   .kpi .label { font-size: 13px; color: var(--text-3); }
   .kpi .num { font-size: 22px; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; }
@@ -1025,7 +1025,6 @@
       <button data-tab="stock">Stocks food</button>
       <button data-tab="menus">Menus</button>
       <button data-tab="members">Où sont les membres</button>
-      <button data-tab="budget">Budget</button>
       <button data-tab="shop">Boutique</button>
       <button data-tab="cotisations">Cotisations</button>
       <button data-tab="soutien">Soutien actif</button>
@@ -1053,27 +1052,6 @@
           <div id="ov-food"></div>
         </div>
       </div>
-    </div>
-
-    <!-- Budget -->
-    <div data-panel="budget" hidden>
-      <div class="grid grid-2">
-        <div class="card panel"><h3>Dépenses par poste</h3><div class="bars" id="budget-bars"></div></div>
-        <div class="card panel">
-          <h3>Ajouter une ligne</h3>
-          <form id="budget-form" class="form-grid">
-            <label class="field"><span>Libellé</span><input name="label" required></label>
-            <label class="field"><span>Poste</span><input name="category" list="budget-cats" required></label>
-            <label class="field"><span>Type</span><select name="type"><option value="depense">Dépense</option><option value="recette">Recette</option></select></label>
-            <label class="field"><span>Montant (€)</span><input name="amount" type="number" step="0.01" min="0" required></label>
-            <label class="field"><span>Date</span><input name="date" type="date" required></label>
-            <button class="btn" type="submit">Ajouter</button>
-          </form>
-          <datalist id="budget-cats"></datalist>
-        </div>
-      </div>
-      <h3 class="sub-head">Toutes les opérations</h3>
-      <div class="table-wrap"><table id="budget-table"></table></div>
     </div>
 
     <!-- Stocks -->
@@ -1405,12 +1383,11 @@
           <label class="field"><span>Début de campagne</span><input name="campaignStart" type="date" required></label>
           <label class="field"><span>Durée (jours)</span><input name="campaignDays" type="number" min="1" max="31" required></label>
         </div>
-        <label class="field" style="margin-top:12px"><span>Plafond de budget (€)</span><input name="budgetCap" type="number" min="0" step="1"></label>
-        <label class="field"><span>E-mail de contact de la liste</span><input name="contactEmail" type="email"></label>
+        <label class="field" style="margin-top:12px"><span>E-mail de contact de la liste</span><input name="contactEmail" type="email"></label>
         <label class="field"><span>Instagram (sans @)</span><input name="instagram"></label>
         <label class="field"><span>Webhook d'inscription e-mail (n8n, Zapier, Google Apps Script…)</span><input name="signupWebhook" type="url" placeholder="https://…"></label>
         <label class="field"><span>Code d'accès à l'espace liste</span><input name="adminCode" required minlength="8" autocomplete="off"></label>
-        <p class="faint" style="margin:-4px 0 14px">Ce code protège le budget, les stocks et les adresses des abonnés : ils sont chiffrés avec lui. Si vous le changez, prévenez tous les membres.</p>
+        <p class="faint" style="margin:-4px 0 14px">Ce code protège les stocks et les adresses des abonnés : ils sont chiffrés avec lui. Si vous le changez, prévenez tous les membres.</p>
         <div class="toolbar"><button class="btn" type="submit">Enregistrer</button><button class="btn btn-danger" type="button" id="reset-btn">Revenir aux données publiées</button></div>
         <p class="note" id="settings-status"></p>
       </form>
