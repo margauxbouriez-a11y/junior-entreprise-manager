@@ -1924,9 +1924,11 @@
     const prizeName = (d.prizeName || '').trim(); delete d.prizeName;
     d.photos = [...eventDraft.photos];
     d.prize = prizeName || eventDraft.prizePhoto ? { name: prizeName || 'Lot surprise', photo: eventDraft.prizePhoto } : null;
-    if (d.id) Object.assign(data.events.find((x) => x.id === d.id) || {}, d);
+    const existing = d.id && data.events.find((x) => x.id === d.id);
+    if (existing) Object.assign(existing, d);
     else data.events.push({ ...d, id: uid('e') });
-    e.target.reset(); eventDraft = { photos: [], prizePhoto: '' }; renderEventDraft(); $('#event-status').textContent = '';
+    // reset() ne vide pas les champs cachés : sans ça, l'ajout suivant écrasait l'événement modifié juste avant
+    e.target.reset(); e.target.id.value = ''; eventDraft = { photos: [], prizePhoto: '' }; renderEventDraft(); $('#event-status').textContent = '';
     $('#event-form-title').textContent = 'Ajouter un événement'; save();
   });
   $('#event-cancel').addEventListener('click', () => {
