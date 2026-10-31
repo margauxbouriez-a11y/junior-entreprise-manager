@@ -1321,8 +1321,8 @@
     <div data-panel="events" hidden>
       <div class="table-wrap"><table id="events-table"></table></div>
       <h3 class="sub-head" id="event-form-title">Ajouter un événement</h3>
-      <form id="event-form" class="card panel">
-        <input type="hidden" name="id">
+      <form id="event-form" class="card panel" autocomplete="off">
+        <p class="hint" id="event-editing" hidden style="margin:0 0 12px;padding:8px 12px;border-radius:8px;background:#fff4d6;color:#7a5200;font-weight:600"></p>
         <div class="form-grid">
           <label class="field"><span>Titre</span><input name="title" required></label>
           <label class="field"><span>Date</span><input name="date" type="date" required></label>
@@ -1339,7 +1339,7 @@
         </div>
         <div class="thumbs" id="event-photos-preview"></div>
         <p class="note" id="event-status"></p>
-        <div class="toolbar"><button class="btn" type="submit">Enregistrer</button><button class="btn btn-ghost" type="reset" id="event-cancel">Annuler</button></div>
+        <div class="toolbar"><button class="btn" type="submit">Enregistrer</button><button class="btn btn-ghost" type="reset" id="event-cancel">Annuler</button><button class="btn btn-ghost" type="button" id="event-save-new" hidden>Enregistrer comme nouvel événement</button></div>
         <datalist id="event-cats"><option>Soirée</option><option>Sport</option><option>Conférence</option><option>Atelier</option><option>Networking</option><option>Food</option></datalist>
       </form>
     </div>

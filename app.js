@@ -1918,21 +1918,36 @@
     e.target.reset(); save();
   });
 
-  $('#event-form').addEventListener('submit', (e) => {
-    e.preventDefault();
-    const d = formData(e.target);
+  // L'événement en cours de modification est gardé ici, et seulement ici : un champ caché
+  // du formulaire pouvait rester rempli (rechargement, navigateur qui restaure le formulaire)
+  // et transformer un ajout en modification d'un autre événement.
+  let editingEventId = null;
+  function setEditingEvent(ev) {
+    editingEventId = ev ? ev.id : null;
+    $('#event-form-title').textContent = ev ? `Modifier « ${ev.title} »` : 'Ajouter un événement';
+    const banner = $('#event-editing');
+    banner.hidden = !ev;
+    banner.textContent = ev ? `Vous modifiez « ${ev.title} ». Pour créer un autre événement, cliquez sur « Annuler » ou sur « Enregistrer comme nouvel événement ».` : '';
+    $('#event-save-new').hidden = !ev;
+  }
+  function submitEvent(asNew) {
+    const form = $('#event-form');
+    if (!form.reportValidity()) return;
+    const d = formData(form);
+    delete d.id;
     const prizeName = (d.prizeName || '').trim(); delete d.prizeName;
     d.photos = [...eventDraft.photos];
     d.prize = prizeName || eventDraft.prizePhoto ? { name: prizeName || 'Lot surprise', photo: eventDraft.prizePhoto } : null;
-    const existing = d.id && data.events.find((x) => x.id === d.id);
+    const existing = !asNew && editingEventId && data.events.find((x) => x.id === editingEventId);
     if (existing) Object.assign(existing, d);
     else data.events.push({ ...d, id: uid('e') });
-    // reset() ne vide pas les champs cachés : sans ça, l'ajout suivant écrasait l'événement modifié juste avant
-    e.target.reset(); e.target.id.value = ''; eventDraft = { photos: [], prizePhoto: '' }; renderEventDraft(); $('#event-status').textContent = '';
-    $('#event-form-title').textContent = 'Ajouter un événement'; save();
-  });
+    form.reset(); eventDraft = { photos: [], prizePhoto: '' }; renderEventDraft(); $('#event-status').textContent = '';
+    setEditingEvent(null); save();
+  }
+  $('#event-form').addEventListener('submit', (e) => { e.preventDefault(); submitEvent(false); });
+  $('#event-save-new').addEventListener('click', () => submitEvent(true));
   $('#event-cancel').addEventListener('click', () => {
-    $('#event-form-title').textContent = 'Ajouter un événement'; $('#event-form').id.value = '';
+    setEditingEvent(null);
     eventDraft = { photos: [], prizePhoto: '' }; renderEventDraft();
   });
   $('#event-photos-input').addEventListener('change', async (e) => {
@@ -2157,10 +2172,10 @@
     }
     if (t.dataset.editEvent) {
       const ev = findIn('events', t.dataset.editEvent); const f = $('#event-form');
-      ['id', 'title', 'date', 'start', 'end', 'place', 'category', 'description'].forEach((k) => { f[k].value = ev[k] || ''; });
+      ['title', 'date', 'start', 'end', 'place', 'category', 'description'].forEach((k) => { f[k].value = ev[k] || ''; });
       f.prizeName.value = (ev.prize && ev.prize.name) || '';
       eventDraft = { photos: [...(ev.photos || [])], prizePhoto: (ev.prize && ev.prize.photo) || '' }; renderEventDraft();
-      $('#event-form-title').textContent = `Modifier « ${ev.title} »`;
+      setEditingEvent(ev);
       f.scrollIntoView({ behavior: 'smooth', block: 'center' }); return;
     }
     if (t.dataset.mail || t.dataset.copymail) {

@@ -164,6 +164,90 @@ window.JE_DATA = {
       "description": "",
       "photos": [],
       "prize": null
+    },
+    {
+      "id": "emvr8betterave",
+      "title": "Betterave POTA x TBA x LECLERCQ",
+      "date": "2026-11-03",
+      "start": "19:00",
+      "end": "22:00",
+      "place": ".",
+      "category": "",
+      "description": "",
+      "photos": [],
+      "prize": null
+    },
+    {
+      "id": "emvuuk487aaqz",
+      "title": "Brigade leclercq au Big chef",
+      "date": "2026-11-03",
+      "start": "11:30",
+      "end": "13:00",
+      "place": "RU",
+      "category": "",
+      "description": "",
+      "photos": [],
+      "prize": null
+    },
+    {
+      "id": "erestaure0mvwxhy51",
+      "title": "Le réveil de la force",
+      "date": "2026-11-02",
+      "start": "06:30",
+      "end": "09:00",
+      "place": "Bat L1",
+      "category": "",
+      "description": "",
+      "photos": [],
+      "prize": null
+    },
+    {
+      "id": "erestaure1mvwxhy51",
+      "title": "La PPGalaxie des saveurs",
+      "date": "2026-11-02",
+      "start": "20:30",
+      "end": "21:45",
+      "place": "Salle bat A et sainté",
+      "category": "",
+      "description": "Régalez-vous à la sortie de votre PPG",
+      "photos": [],
+      "prize": null
+    },
+    {
+      "id": "erestaure2mvwxhy51",
+      "title": "L'éclipse néon",
+      "date": "2026-11-04",
+      "start": "20:30",
+      "end": "",
+      "place": "KFET",
+      "category": "",
+      "description": "",
+      "photos": [],
+      "prize": null
+    },
+    {
+      "id": "erestaure3mvwxhy51",
+      "title": "On vous accueille  ",
+      "date": "2026-11-01",
+      "start": "18:00",
+      "end": "19:00",
+      "place": ".",
+      "category": "",
+      "description": "",
+      "photos": [],
+      "prize": null
+    },
+    {
+      "id": "erestaure4mvwxhy51",
+      "title": "Un ballon vers les étoiles",
+      "date": "2026-11-03",
+      "start": "11:00",
+      "end": "18:00",
+      "place": ".",
+      "category": "",
+      "description": "Collab Red Bull ",
+      "photos": [],
+      "prize": null
     }
   ],
   "food": [
