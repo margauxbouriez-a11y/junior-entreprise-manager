@@ -3,7 +3,7 @@
 Site de campagne de la liste **Leclercq des étoiles** (HEC Paris), thème « guerre des étoiles » (bleu et or), avec une face pour les étudiants et un espace de gestion pour la liste.
 
 Site statique : aucun serveur ni installation. Ouvrez `index.html` dans un navigateur, ou publiez le dépôt avec GitHub Pages (Settings → Pages → Deploy from a branch → `main` / `(root)`).
-Adresse une fois publiée : https://margauxbouriez-a11y.github.io/junior-entreprise-manager/
+Adresse une fois publiée : https://leclercqdesetoiles.xyz/
 
 ## Fichiers
 - `data.js` — le contenu du site. Il est mis à jour automatiquement depuis l'Espace liste (voir plus bas). La partie publique (programme, food, équipe…) est lisible ; la partie privée (stocks, menus, abonnés) est chiffrée.
@@ -23,11 +23,24 @@ Adresse une fois publiée : https://margauxbouriez-a11y.github.io/junior-entrepr
 - Dans le **Programme**, chaque événement peut afficher ses photos (clic pour agrandir) et un lot à gagner.
 - **Inscription e-mail** pour recevoir le programme.
 
+## Nom de domaine : leclercqdesetoiles.xyz
+Le site est publié sur **https://leclercqdesetoiles.xyz** (domaine acheté chez GoDaddy). Le fichier `CNAME` indique ce domaine à GitHub Pages ; l'ancienne adresse `github.io` redirige automatiquement vers lui.
+Réglages DNS chez GoDaddy (Mes produits → leclercqdesetoiles.xyz → DNS) :
+| Type | Nom | Valeur |
+|---|---|---|
+| A | @ | 185.199.108.153 |
+| A | @ | 185.199.109.153 |
+| A | @ | 185.199.110.153 |
+| A | @ | 185.199.111.153 |
+| CNAME | www | margauxbouriez-a11y.github.io |
+Supprimer les autres enregistrements A de `@` et l'enregistrement « Parked » / « Forwarding » de GoDaddy. Puis sur GitHub : Settings → Pages → cocher **Enforce HTTPS** dès que la case est disponible.
+⚠️ La clé de publication automatique est enregistrée par adresse : chaque membre la recolle une fois sur le nouveau domaine (Espace liste → Réglages).
+
 ## Appli téléphone (installable)
 Le site s'installe comme une appli, sans App Store ni Play Store : icône Leclercq sur l'écran d'accueil, ouverture en plein écran, fonctionne même sans réseau (dernière version affichée) et se met à jour toute seule.
 - **Android / ordinateur (Chrome, Edge)** : bouton **Installer l'appli** (en haut, dans le bandeau en bas sur téléphone, ou dans le pied de page).
 - **iPhone / iPad** : le même bouton affiche le mode d'emploi : Safari → **Partager** → **Sur l'écran d'accueil** → **Ajouter**.
-- Lien à partager : https://margauxbouriez-a11y.github.io/junior-entreprise-manager/
+- Lien à partager : https://leclercqdesetoiles.xyz/
 - Fichiers : `manifest.webmanifest` (nom, couleurs, icônes), `sw.js` (hors ligne), `pwa.js` (bouton d'installation), icônes dans `assets/app/`.
 - Pour changer l'icône : remplacez les images de `assets/app/`, puis passez `VERSION` à `v2` dans `sw.js`.
 
