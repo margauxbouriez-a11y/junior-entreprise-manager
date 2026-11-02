@@ -15,6 +15,11 @@
 <meta property="og:url" content="https://margauxbouriez-a11y.github.io/junior-entreprise-manager/">
 <link rel="icon" href="assets/favicon.png">
 <link rel="apple-touch-icon" href="assets/logo-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Leclercq">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta property="og:image" content="https://margauxbouriez-a11y.github.io/junior-entreprise-manager/assets/logo.jpg">
 <meta name="theme-color" content="#00218F">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -727,6 +732,26 @@
   }
 
   @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  /* ---------- Appli installable ---------- */
+  .install-btn svg { width: 15px; height: 15px; }
+  @media (max-width: 640px) { .install-btn { width: 32px; padding: 0; gap: 0; font-size: 0; } .install-btn svg { width: 16px; height: 16px; } }
+  .install-banner { position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 45; display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 12px; border-radius: var(--r); background: var(--royal-deep); border: 1px solid rgba(245, 220, 74, .45); box-shadow: 0 10px 30px rgba(0, 8, 40, .55); }
+  .install-banner img { width: 40px; height: 40px; border-radius: 9px; flex: none; }
+  .install-banner div { flex: 1; min-width: 0; line-height: 1.3; }
+  .install-banner b { display: block; font-size: 14px; }
+  .install-banner span { display: block; font-size: 12.5px; color: var(--text-3); }
+  .install-banner .x { background: none; border: 0; color: var(--text-3); font-size: 18px; width: 32px; height: 32px; cursor: pointer; flex: none; }
+  body.has-install-banner .cart-fab { bottom: calc(92px + env(safe-area-inset-bottom)); }
+  .install-sheet { max-width: 420px; width: calc(100% - 32px); padding: 24px; border-radius: var(--r); border: 1px solid rgba(245, 220, 74, .45); background: var(--royal-night); color: var(--text); }
+  .install-sheet::backdrop { background: rgba(0, 8, 40, .8); }
+  .install-sheet h3 { font-size: 18px; margin: 0 0 4px; }
+  .install-sheet p { color: var(--text-2); font-size: 14px; margin: 0 0 16px; }
+  .install-sheet ol { margin: 0 0 20px; padding-left: 22px; display: grid; gap: 12px; font-size: 15px; line-height: 1.45; }
+  .install-sheet ol svg { width: 18px; height: 18px; vertical-align: -3px; color: var(--gold); }
+  .install-sheet .btn { width: 100%; }
+  /* Dans l'appli : laisser la place à l'encoche et à la barre d'état */
+  html.is-app .nav { padding-top: env(safe-area-inset-top); }
+  html.is-app #site-footer { padding-bottom: env(safe-area-inset-bottom); }
 </style>
 
 </head>
@@ -745,6 +770,7 @@
       <li><a href="#partenaires">Partenaires</a></li>
       <li><a href="#equipe">L'équipe</a></li>
     </ul></nav>
+    <button class="btn btn-accent btn-sm install-btn" id="install-btn" type="button" aria-label="Installer l'appli" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>Installer l'appli</button>
     <button class="btn btn-ghost btn-sm" id="switch-btn" type="button">Espace liste</button>
   </div>
 </header>
@@ -1402,6 +1428,24 @@
   <p id="lightbox-caption"></p>
 </dialog>
 
+<div class="install-banner" id="install-banner" hidden>
+  <img src="assets/app/icon-192.png" alt="">
+  <div><b>L'appli Leclercq</b><span>Programme, food et commandes en un geste</span></div>
+  <button class="btn btn-accent btn-sm" id="install-banner-go" type="button">Installer</button>
+  <button class="x" id="install-banner-x" type="button" aria-label="Fermer">✕</button>
+</div>
+
+<dialog class="install-sheet" id="install-sheet" aria-labelledby="install-title">
+  <h3 id="install-title">Installer l'appli sur l'iPhone</h3>
+  <p>Gratuit, sans App Store : 3 touches dans Safari.</p>
+  <ol>
+    <li>Touchez le bouton <b>Partager</b> <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m8 7 4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg> en bas de l'écran (ou en haut sur iPad).</li>
+    <li>Faites défiler et choisissez <b>Sur l'écran d'accueil</b> <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M12 8v8M8 12h8"/></svg>.</li>
+    <li>Touchez <b>Ajouter</b> : l'icône Leclercq apparaît avec vos applis.</li>
+  </ol>
+  <button class="btn btn-accent" type="button" data-close-install>J'ai compris</button>
+</dialog>
+
 <footer id="site-footer">
   <div class="wrap">
     <div class="foot-grid">
@@ -1425,6 +1469,7 @@
         <ul>
           <li><a id="footer-mail" href="#" hidden>Nous écrire</a></li>
           <li><a id="footer-insta" href="#" target="_blank" rel="noopener" hidden>Instagram</a></li>
+          <li hidden><button type="button" id="footer-install">Installer l'appli</button></li>
           <li><button type="button" id="footer-admin">Espace liste</button></li>
         </ul>
       </div>
@@ -1438,5 +1483,6 @@
   document.write('<script src="data.js?v=' + Date.now() + '"><\/script>');
 </script>
 <script src="app.js"></script>
+<script src="pwa.js"></script>
 </body>
 </html>

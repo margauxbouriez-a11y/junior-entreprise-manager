@@ -2360,6 +2360,8 @@
     } catch { /* hors ligne : on réessaiera */ }
   }
   setInterval(refreshPublished, 90000);
+  // Retour sur l'appli ou l'onglet : on vérifie tout de suite s'il y a du nouveau
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshPublished(); });
 
   // Apparition douce des titres de section
   if ('IntersectionObserver' in window) {

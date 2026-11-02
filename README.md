@@ -23,6 +23,14 @@ Adresse une fois publiée : https://margauxbouriez-a11y.github.io/junior-entrepr
 - Dans le **Programme**, chaque événement peut afficher ses photos (clic pour agrandir) et un lot à gagner.
 - **Inscription e-mail** pour recevoir le programme.
 
+## Appli téléphone (installable)
+Le site s'installe comme une appli, sans App Store ni Play Store : icône Leclercq sur l'écran d'accueil, ouverture en plein écran, fonctionne même sans réseau (dernière version affichée) et se met à jour toute seule.
+- **Android / ordinateur (Chrome, Edge)** : bouton **Installer l'appli** (en haut, dans le bandeau en bas sur téléphone, ou dans le pied de page).
+- **iPhone / iPad** : le même bouton affiche le mode d'emploi : Safari → **Partager** → **Sur l'écran d'accueil** → **Ajouter**.
+- Lien à partager : https://margauxbouriez-a11y.github.io/junior-entreprise-manager/
+- Fichiers : `manifest.webmanifest` (nom, couleurs, icônes), `sw.js` (hors ligne), `pwa.js` (bouton d'installation), icônes dans `assets/app/`.
+- Pour changer l'icône : remplacez les images de `assets/app/`, puis passez `VERSION` à `v2` dans `sw.js`.
+
 ## Espace liste (bouton « Espace liste », ou `#liste` à la fin de l'adresse)
 Code d'accès par défaut : `leclercq2026` (modifiable dans Réglages). Il chiffre aussi les données privées.
 - **Aperçu** (page d'accueil de l'espace) : les stocks food à surveiller avec boutons +/−, la position et le statut de chaque membre (modifiables directement), et les stands food du jour avec le compteur de portions servies.
