@@ -1,7 +1,7 @@
 {
   "name": "Leclercq des étoiles",
   "short_name": "Leclercq",
-  "description": "La liste Leclercq des étoiles (Junior Entreprise HEC Paris) : programme, stands food, commandes offertes, jeu concours et équipe, en direct.",
+  "description": "La liste Leclercq des étoiles (Junior Entreprise HEC Paris) : programme, stands food, jeu concours et équipe, en direct.",
   "id": "./",
   "start_url": "./?source=app",
   "scope": "./",
@@ -11,16 +11,67 @@
   "theme_color": "#00218F",
   "lang": "fr",
   "dir": "ltr",
-  "categories": ["education", "lifestyle", "social"],
+  "categories": [
+    "education",
+    "lifestyle",
+    "social"
+  ],
   "icons": [
-    { "src": "assets/app/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "assets/app/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "assets/app/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
-    { "src": "assets/app/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "assets/app/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/app/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/app/icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "assets/app/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ],
   "shortcuts": [
-    { "name": "Programme", "url": "./#programme", "icons": [{ "src": "assets/app/icon-192.png", "sizes": "192x192" }] },
-    { "name": "Commander", "url": "./#commander", "icons": [{ "src": "assets/app/icon-192.png", "sizes": "192x192" }] },
-    { "name": "Stands food", "url": "./#food", "icons": [{ "src": "assets/app/icon-192.png", "sizes": "192x192" }] }
+    {
+      "name": "Programme",
+      "url": "./#programme",
+      "icons": [
+        {
+          "src": "assets/app/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Jeu concours",
+      "url": "./#concours",
+      "icons": [
+        {
+          "src": "assets/app/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Stands food",
+      "url": "./#food",
+      "icons": [
+        {
+          "src": "assets/app/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
   ]
 }

@@ -2,10 +2,10 @@
    - Le contenu (page, app.js, data.js) vient toujours du réseau en priorité :
      les mises à jour publiées depuis l'Espace liste arrivent tout de suite.
    - Hors ligne, l'appli affiche la dernière version enregistrée.
-   - Les envois (commandes, cotisations, concours, publication GitHub) ne passent
+   - Les envois (cotisations, concours, publication GitHub) ne passent
      jamais par ici : seules les lectures GET de ce site et des polices sont gérées.
    Changer VERSION force le renouvellement du cache sur tous les téléphones. */
-const VERSION = 'v2';
+const VERSION = 'v3';
 const CACHE = `leclercq-${VERSION}`;
 const FONTS = `leclercq-fonts-${VERSION}`;
 

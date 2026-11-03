@@ -307,7 +307,7 @@
   const STEP_ICON = {
     programme: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18M8 14h3M8 17h6"/></svg>',
     food: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11h16a8 8 0 0 1-16 0z"/><path d="M8 7c0-1.5 1-2 1-3M12 7c0-1.5 1-2 1-3M16 7c0-1.5 1-2 1-3"/></svg>',
-    demandes: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2.5 3.5h3l2.4 11.2a1.6 1.6 0 0 0 1.6 1.3h8.3a1.6 1.6 0 0 0 1.6-1.2L21.5 8H6.3"/></svg>',
+    concours: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M19 12v9H5v-9M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 0 1 0 5"/></svg>',
     equipe: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6.5 6.5 0 0 1 3.5 5.5"/></svg>',
   };
 
@@ -374,7 +374,7 @@
     const steps = [
       { href: '#programme', icon: 'programme', title: 'Consulter le programme', text: 'Les événements et les stands de chaque jour de la campagne, heure par heure.', cta: 'Voir le programme' },
       { href: '#food', icon: 'food', title: 'Trouver un stand food', text: 'Horaires, lieux et portions restantes, mis à jour pendant les stands.', cta: 'Voir les stands' },
-      { href: '#commander', icon: 'demandes', title: 'Commander', text: 'Boissons, crêpes, ménage : tout est offert et livré sur le campus.', cta: 'Passer commande' },
+      { href: '#concours', icon: 'concours', title: 'Tenter sa chance', text: 'Le jeu concours de la liste : les lots, le nombre d\'inscrits et l\'inscription.', cta: 'Voir le jeu concours' },
       { href: '#equipe', icon: 'equipe', title: 'Joindre un membre', text: 'Où est chaque membre de la liste, qui est disponible, et son numéro.', cta: "Voir l'équipe" },
     ];
     $('#quick').innerHTML = steps.map((st) => `
@@ -525,172 +525,6 @@
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     try { return await res.json(); } catch { return {}; }
   }
-
-  // ---------- Boutique (tout est offert) ----------
-  const CART_KEY = 'leclercq-cart';
-  const products = () => (Array.isArray(data.products) ? data.products : []);
-  const productCats = () => [...new Set(products().map((x) => x.category || 'Autres'))];
-  const maxOf = (prod) => Math.max(1, Number(prod.max) || 1);
-  let shopCat = 'Tout';
-  let cart = (() => { try { return JSON.parse(storage.get(CART_KEY)) || {}; } catch { return {}; } })();
-  const saveCart = () => storage.set(CART_KEY, JSON.stringify(cart));
-  const cartLines = () => Object.entries(cart)
-    .map(([id, qty]) => ({ prod: products().find((x) => x.id === id), qty }))
-    .filter((l) => l.prod && l.prod.available !== false && l.qty > 0);
-  const cartCount = () => cartLines().reduce((n, l) => n + l.qty, 0);
-  const shopOpen = () => data.config.ordersOpen !== false;
-
-  function setQty(id, qty) {
-    const prod = products().find((x) => x.id === id);
-    if (!prod) return;
-    const q = Math.max(0, Math.min(maxOf(prod), qty));
-    if (q) cart[id] = q; else delete cart[id];
-    saveCart();
-    renderShop(); renderCart();
-  }
-
-  function renderShop() {
-    const cats = productCats();
-    if (shopCat !== 'Tout' && !cats.includes(shopCat)) shopCat = 'Tout';
-    $('#commander').hidden = !products().length;
-    $('#shop-closed').hidden = shopOpen();
-    $('#shop-pay').textContent = data.config.deliveryNote || '';
-    $('#shop-intro').textContent = data.config.shopIntro || 'Boissons, crêpes et plus encore, offerts par la liste et livrés sur le campus.';
-    $('#shop-cats').innerHTML = (cats.length > 1 ? ['Tout', ...cats] : []).map((c) =>
-      `<button type="button" data-shopcat="${esc(c)}" class="${c === shopCat ? 'on' : ''}">${esc(c)}</button>`).join('');
-    const shown = shopCat === 'Tout' ? cats : [shopCat];
-    const itemHtml = (prod) => {
-      const qty = cart[prod.id] || 0;
-      const off = prod.available === false || !shopOpen();
-      const action = off
-        ? `<span class="chip">${prod.available === false ? 'Épuisé' : 'Fermé'}</span>`
-        : qty
-          ? `<span class="stepper"><button type="button" data-cart="${esc(prod.id)}" data-delta="-1" aria-label="Retirer">−</button><b>${qty}</b><button type="button" data-cart="${esc(prod.id)}" data-delta="1" aria-label="Ajouter" ${qty >= maxOf(prod) ? 'disabled' : ''}>+</button></span>`
-          : `<button class="btn btn-sm" type="button" data-cart="${esc(prod.id)}" data-delta="1">Ajouter</button>`;
-      const photos = prod.photos || [];
-      return `<div class="item ${qty ? 'in-cart' : ''} ${off ? 'off' : ''}">
-        ${photos.length ? `<button type="button" class="ph" data-zoom="${esc(photos[0])}" data-caption="${esc(prod.name)}" data-gallery="${esc(prod.id)}"><img src="${esc(imgSrc(photos[0]))}" alt="${esc(prod.name)}" loading="lazy">${photos.length > 1 ? `<span class="more">${photos.length} photos</span>` : ''}</button>` : ''}
-        <div><h4>${esc(prod.name)}</h4>${prod.desc ? `<p>${esc(prod.desc)}</p>` : ''}</div>
-        <span class="limit">Offert<small>${maxOf(prod)} max. par commande</small></span>
-        <div class="act">${action}</div>
-      </div>`;
-    };
-    $('#products').innerHTML = shown.map((c) => {
-      const items = products().filter((x) => (x.category || 'Autres') === c);
-      return items.length ? `<div class="menu-cat"><h3>${esc(c)}</h3><div class="menu">${items.map(itemHtml).join('')}</div></div>` : '';
-    }).join('') || '<div class="empty">Le catalogue arrive bientôt.</div>';
-    const n = cartCount();
-    $('#cart-count').textContent = n;
-    if ($('#hero-facts').childElementCount) renderHeroFacts();
-    $('#cart-fab').hidden = !n || !shopOpen() || view !== 'public';
-  }
-
-  function renderCart() {
-    const lines = cartLines();
-    $('#cart-items').innerHTML = lines.length ? lines.map((l) => `
-      <div class="cart-line">
-        <div class="cl-name">${(l.prod.photos || [])[0] ? `<img src="${esc(imgSrc(l.prod.photos[0]))}" alt="">` : ''}<div><b>${esc(l.prod.name)}</b><small>${esc(l.prod.category || '')} · ${maxOf(l.prod)} max.</small></div></div>
-        <span class="stepper"><button type="button" data-cart="${esc(l.prod.id)}" data-delta="-1" aria-label="Retirer">−</button><b>${l.qty}</b><button type="button" data-cart="${esc(l.prod.id)}" data-delta="1" aria-label="Ajouter" ${l.qty >= maxOf(l.prod) ? 'disabled' : ''}>+</button></span>
-        <span class="line-total">Offert</span>
-      </div>`).join('') + `<div class="cart-total"><span>${cartCount()} article${cartCount() > 1 ? 's' : ''}</span><span>Tout est offert</span></div>`
-      : '<p class="cart-empty">Votre commande est vide. Ajoutez des articles depuis la boutique.</p>';
-    $('#order-form').hidden = !lines.length;
-  }
-
-  function openCart() {
-    $('#cart-step').hidden = false; $('#order-done').hidden = true;
-    $('#order-status').textContent = '';
-    renderCart();
-    $('#cart').hidden = false;
-    document.body.style.overflow = 'hidden';
-    setTimeout(() => $('.drawer-x').focus(), 0);
-  }
-  function closeCart() {
-    $('#cart').hidden = true;
-    document.body.style.overflow = '';
-  }
-  $('#cart-fab').addEventListener('click', openCart);
-  $('#cart').addEventListener('click', (e) => { if (e.target.closest('[data-close-cart]')) closeCart(); });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#cart').hidden) closeCart(); });
-  document.addEventListener('click', (e) => {
-    const b = e.target.closest('[data-cart]');
-    if (b) { setQty(b.dataset.cart, (cart[b.dataset.cart] || 0) + Number(b.dataset.delta)); return; }
-    const c = e.target.closest('[data-shopcat]');
-    if (c) { shopCat = c.dataset.shopcat; renderShop(); }
-  });
-
-  const orderNumber = () => {
-    const d = new Date();
-    return `LQ-${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}-${Math.floor(1000 + Math.random() * 9000)}`;
-  };
-
-  $('#order-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const form = e.target;
-    const status = $('#order-status');
-    status.className = 'note';
-    const lines = cartLines();
-    if (!lines.length) return;
-    if (!form.reportValidity()) return;
-    const id = orderNumber();
-    const itemsText = lines.map((l) => `${l.qty} × ${l.prod.name}`).join('\n');
-    const payload = {
-      orderId: id,
-      items: itemsText,
-      itemsJson: JSON.stringify(lines.map((l) => ({ id: l.prod.id, name: l.prod.name, qty: l.qty }))),
-      count: String(cartCount()),
-      name: form.name.value.trim(),
-      email: form.email.value.trim(),
-      phone: form.phone.value.trim(),
-      where: form.where.value.trim(),
-      when: form.when.value.trim() || 'Dès que possible',
-      notes: form.notes.value.trim(),
-      website: form.website.value,
-      list: data.config.listName,
-      sentAt: new Date().toISOString(),
-    };
-    const done = () => {
-      cart = {}; saveCart(); form.reset();
-      $('#cart-step').hidden = true;
-      $('#order-done').hidden = false;
-      $('#order-done').innerHTML = `<div class="done">
-        <div class="done-badge">✓</div>
-        <h4>Commande envoyée !</h4>
-        <div class="order-no">${esc(id)}</div>
-        <p class="muted">Un membre de la liste vous livre ${esc(payload.where)} (${esc(payload.when.toLowerCase())}). Gardez votre numéro de commande.</p>
-        <div class="done-recap">${lines.map((l) => `<div class="cart-line" style="grid-template-columns:1fr auto"><b>${esc(l.prod.name)}</b><span>× ${l.qty}</span></div>`).join('')}</div>
-        <button class="btn btn-ghost" type="button" data-close-cart>Fermer</button>
-      </div>`;
-      renderShop();
-    };
-    if (payload.website) { done(); return; } // robot : on fait semblant
-
-    const hook = data.config.orderWebhook;
-    if (!hook) {
-      const mail = data.config.contactEmail;
-      if (!mail) { status.className = 'note err'; status.textContent = "Les commandes ne sont pas encore ouvertes. Revenez très vite !"; return; }
-      const body = [`Commande ${id}`, '', itemsText, '', `Nom : ${payload.name}`, `E-mail : ${payload.email}`, `Téléphone : ${payload.phone}`,
-        `Où : ${payload.where}`, `Quand : ${payload.when}`, payload.notes ? `Précisions : ${payload.notes}` : ''].join('\n');
-      location.href = `mailto:${encodeURIComponent(mail)}?subject=${encodeURIComponent(`[Commande ${id}] ${payload.name}`)}&body=${encodeURIComponent(body)}`;
-      done();
-      return;
-    }
-    const btn = $('#order-submit');
-    btn.disabled = true;
-    status.textContent = 'Envoi de la commande…';
-    try {
-      const res = await postToWebhook(hook, payload);
-      if (res && res.ok === false) throw new Error(res.error || 'refus');
-      done();
-    } catch {
-      status.className = 'note err';
-      status.innerHTML = data.config.contactEmail
-        ? `La commande n'est pas partie. Réessayez, ou écrivez-nous à <a href="mailto:${esc(data.config.contactEmail)}">${esc(data.config.contactEmail)}</a>.`
-        : "La commande n'est pas partie. Réessayez dans un instant.";
-    } finally {
-      btn.disabled = false;
-    }
-  });
 
   // ---------- Jeu concours ----------
   const contest = () => data.contest || {};
@@ -943,8 +777,7 @@
     const z = e.target.closest('[data-zoom]');
     if (z && !e.target.closest('.thumb-x')) {
       const box = $('#lightbox');
-      const prod = z.dataset.gallery && products().find((x) => x.id === z.dataset.gallery);
-      gallery = { list: prod ? prod.photos : [z.dataset.zoom], i: 0, caption: z.dataset.caption || '' };
+      gallery = { list: [z.dataset.zoom], i: 0, caption: z.dataset.caption || '' };
       showGallery();
       if (box.showModal) box.showModal(); else box.setAttribute('open', '');
       return;
@@ -1001,7 +834,6 @@
     $('#admin-view').hidden = v !== 'admin';
     $('#public-nav').style.visibility = v === 'public' ? 'visible' : 'hidden';
     $('#switch-btn').textContent = v === 'public' ? 'Espace liste' : 'Voir le site';
-    renderShop();
     $('#login-box').hidden = isAdmin;
     $('#admin-app').hidden = !isAdmin;
     if (v === 'admin' && history.replaceState) history.replaceState(null, '', '#liste');
@@ -1066,7 +898,6 @@
     $$('#admin-tabs button').forEach((x) => x.classList.toggle('on', x.dataset.tab === tab));
     $$('[data-panel]').forEach((p) => { p.hidden = p.dataset.panel !== tab; });
     if (tab === 'cotisations' || tab === 'soutien') loadAdhesions();
-    if (tab === 'shop') loadOrders();
     if (tab === 'contest') loadInscrits();
   }
   $('#admin-tabs').addEventListener('click', (e) => {
@@ -1515,36 +1346,6 @@
     }).join('') + '</div>' : '<p class="ov-empty">Aucun stand prévu.</p>';
   }
 
-  function renderShopAdmin() {
-    const f = $('#shop-form');
-    if (!f.contains(document.activeElement)) {
-      f.ordersOpen.checked = data.config.ordersOpen !== false;
-      f.orderWebhook.value = data.config.orderWebhook || '';
-      f.deliveryNote.value = data.config.deliveryNote || '';
-    }
-    $('#product-cats').innerHTML = [...new Set(['Boissons', 'Food', ...productCats()])].map((c) => `<option>${esc(c)}</option>`).join('');
-    if (!f.contains(document.activeElement)) f.shopIntro.value = data.config.shopIntro || '';
-    const list = products();
-    $('#products-admin').innerHTML = list.map((x, i) => `
-      <div class="edit-card ${x.available === false ? 'off' : ''}">
-        <div class="head"><div class="prize-mini">${(x.photos || [])[0] ? `<img src="${esc(imgSrc(x.photos[0]))}" alt="">` : esc(initials(x.name || '?'))}</div>
-          <input value="${esc(x.name)}" data-product="${x.id}" data-field="name" aria-label="Nom"></div>
-        <div class="row2">
-          <label class="mini-field">Catégorie<input value="${esc(x.category)}" data-product="${x.id}" data-field="category" list="product-cats"></label>
-          <label class="mini-field">Max / commande<input type="number" min="1" max="50" value="${esc(maxOf(x))}" data-product="${x.id}" data-field="max"></label>
-        </div>
-        <label class="mini-field">Description<textarea rows="2" data-product="${x.id}" data-field="desc">${esc(x.desc)}</textarea></label>
-        ${(x.photos || []).length ? `<div class="thumbs">${x.photos.map((src, k) => thumb(src, x.name, `<span class="thumb-x" role="button" data-del-photo="product" data-id="${x.id}" data-index="${k}" aria-label="Retirer">✕</span>`)).join('')}</div>` : ''}
-        <label class="check-row"><input type="checkbox" ${x.available !== false ? 'checked' : ''} data-product="${x.id}" data-field="available"> <span>Disponible</span></label>
-        <div class="foot">
-          <span class="toolbar"><label class="btn btn-ghost btn-sm file-btn">+ Photos<input type="file" accept="image/*" multiple data-upload="product" data-id="${x.id}"></label>
-          <span class="order-btns"><button class="btn btn-ghost btn-sm" type="button" data-move="-1" data-id="${x.id}" ${i === 0 ? 'disabled' : ''} aria-label="Monter">↑</button><button class="btn btn-ghost btn-sm" type="button" data-move="1" data-id="${x.id}" ${i === list.length - 1 ? 'disabled' : ''} aria-label="Descendre">↓</button></span></span>
-          ${delBtn('product', x.id)}
-        </div>
-        <span class="upload-note" id="up-${x.id}"></span>
-      </div>`).join('') || '<p class="faint">Aucune proposition pour le moment.</p>';
-  }
-
   // Jeu concours (Espace liste)
   function renderContestAdmin() {
     const c = contest();
@@ -1747,89 +1548,6 @@
     $$('#coti-filter [data-afilter]').forEach((b) => b.classList.toggle('on', b.dataset.afilter === adh.filter.cotisations));
     $$('#soutien-filter [data-afilter]').forEach((b) => b.classList.toggle('on', b.dataset.afilter === adh.filter.soutien));
   }
-  // Commandes de la boutique (Espace liste) : tableau lu dans n8n, comme les cotisations.
-  // Même clé secrète que les cotisations ; adresse = webhook des commandes suivi de « -admin ».
-  const orderAdminUrl = () => {
-    const u = String(data.config.orderWebhook || '').trim();
-    return u ? `${u.replace(/\/+$/, '')}-admin` : '';
-  };
-  const ord = { loading: false, error: '', at: null, rows: [], filter: 'todo' };
-  async function ordRequest(payload) {
-    if (!orderAdminUrl()) throw new Error("Réglez d'abord le webhook des commandes (ci-dessus).");
-    if (!data.adhesionsKey) throw new Error("Réglez d'abord la clé secrète (onglet Cotisations → Connexion n8n).");
-    let res;
-    try { res = await postToWebhook(orderAdminUrl(), { key: data.adhesionsKey, ...payload }); } catch { throw new Error('n8n injoignable. Vérifiez que le workflow « Commandes du site » est publié.'); }
-    if (!res || res.ok !== true) throw new Error(res && res.error === 'cle' ? 'Clé secrète refusée par n8n.' : 'Réponse inattendue de n8n.');
-    return res;
-  }
-  async function loadOrders() {
-    if (!isAdmin || ord.loading) return;
-    if (!orderAdminUrl() || !data.adhesionsKey) { ord.error = ''; renderOrdersAdmin(); return; }
-    ord.loading = true; renderOrdersAdmin();
-    try {
-      const res = await ordRequest({ action: 'list' });
-      ord.rows = Array.isArray(res.commandes) ? res.commandes : [];
-      ord.error = ''; ord.at = new Date();
-    } catch (err) { ord.error = err.message; }
-    ord.loading = false; renderOrdersAdmin();
-  }
-  async function setOrderDone(id, value) {
-    const row = ord.rows.find((r) => String(r.id) === String(id));
-    if (!row) return;
-    const before = row.done;
-    row.done = value; renderOrdersAdmin();
-    try { await ordRequest({ action: 'set', id: row.id, value: value ? 'Oui' : 'Non' }); }
-    catch (err) { row.done = before; ord.error = err.message; renderOrdersAdmin(); }
-  }
-  async function deleteOrder(id) {
-    const row = ord.rows.find((r) => String(r.id) === String(id));
-    if (!row || !confirm(`Supprimer la commande ${row.id} (${row.name}) ?`)) return;
-    try {
-      await ordRequest({ action: 'delete', id: row.id });
-      ord.rows = ord.rows.filter((r) => r !== row); renderOrdersAdmin();
-    } catch (err) { ord.error = err.message; renderOrdersAdmin(); }
-  }
-  function orderRows() {
-    const q = ($('#order-search').value || '').trim().toLowerCase();
-    const indexed = ord.rows.map((r, i) => ({ r, i }));
-    return indexed
-      .filter(({ r }) => (ord.filter === 'todo' ? !r.done : ord.filter === 'done' ? r.done : true))
-      .filter(({ r }) => !q || [r.id, r.name, r.where, r.when, r.articles, r.phone, r.email, r.notes].join(' ').toLowerCase().includes(q))
-      // À livrer : la plus ancienne en premier. Livrées : la plus récente en premier.
-      .sort((a, b) => Number(a.r.done) - Number(b.r.done) || (a.r.done ? b.i - a.i : a.i - b.i))
-      .map(({ r }) => r);
-  }
-  function renderOrdersAdmin() {
-    if (!isAdmin) return;
-    const rows = orderRows();
-    const empty = !orderAdminUrl() || !data.adhesionsKey ? 'Réglez le webhook des commandes et la clé secrète (onglet Cotisations) pour voir les commandes.'
-      : ord.loading && !ord.at ? 'Chargement…'
-        : ord.error ? esc(ord.error)
-          : ord.rows.length ? (ord.filter === 'todo' ? 'Tout est livré.' : 'Aucun résultat.') : 'Aucune commande pour le moment.';
-    const tel = (p) => String(p || '').replace(/[^\d+]/g, '');
-    $('#orders-table').innerHTML = `<thead><tr><th>N°</th><th>Reçue</th><th>Nom</th><th>Articles</th><th>Où · quand</th><th>Contact</th><th>Précisions</th><th>Livrée</th><th></th></tr></thead><tbody>${rows.length ? rows.map((r) => `
-      <tr class="${r.done ? 'is-done' : ''}">
-        <td style="white-space:nowrap"><b>${esc(r.id)}</b></td>
-        <td class="faint" style="white-space:nowrap">${esc(r.date)}</td>
-        <td><b>${esc(r.name)}</b></td>
-        <td>${esc(r.articles)}${r.count ? ` <span class="faint">(${esc(r.count)})</span>` : ''}</td>
-        <td>${esc(r.where)}<br><span class="faint">${esc(r.when)}</span></td>
-        <td>${r.phone ? `<a href="tel:${esc(tel(r.phone))}">${esc(r.phone)}</a>` : ''}${r.phone && r.email ? '<br>' : ''}${r.email ? `<a href="mailto:${esc(r.email)}">${esc(r.email)}</a>` : ''}${!r.phone && !r.email ? '<span class="faint">—</span>' : ''}</td>
-        <td>${r.notes ? esc(r.notes) : '<span class="faint">—</span>'}</td>
-        <td><label class="deliver"><input type="checkbox" data-order-done data-id="${esc(r.id)}" ${r.done ? 'checked' : ''}> ${r.done ? 'Livrée' : 'À livrer'}</label></td>
-        <td class="num"><button class="btn btn-danger btn-sm" type="button" data-order-del data-id="${esc(r.id)}">Suppr.</button></td>
-      </tr>`).join('') : `<tr><td colspan="9" class="faint" style="text-align:center;padding:24px">${empty}</td></tr>`}</tbody>`;
-    const todo = ord.rows.filter((r) => !r.done).length;
-    const when = ord.loading ? 'Actualisation…' : ord.error && ord.at ? `<span style="color:var(--bad)">${esc(ord.error)}</span>` : ord.at ? `à jour à ${ord.at.toTimeString().slice(0, 5).replace(':', 'h')}` : '';
-    $('#orders-sum').innerHTML = `<b>${num(ord.rows.length)}</b> commande${ord.rows.length > 1 ? 's' : ''} · <b>${num(todo)}</b> à livrer${when ? ` · ${when}` : ''}`;
-    $$('#order-filter [data-ofilter]').forEach((b) => b.classList.toggle('on', b.dataset.ofilter === ord.filter));
-  }
-  function ordersCsv() {
-    const cols = [['N°', 'id'], ['Reçue', 'date'], ['Nom', 'name'], ['Articles', 'articles'], ['Nb', 'count'], ['Où', 'where'], ['Quand', 'when'], ['Téléphone', 'phone'], ['E-mail', 'email'], ['Précisions', 'notes'], ['Livrée', 'done']];
-    const cell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-    const lines = ord.rows.map((r) => cols.map(([, k]) => cell(k === 'done' ? (r.done ? 'Oui' : 'Non') : r[k])).join(','));
-    download('commandes.csv', '﻿' + [cols.map(([h]) => cell(h)).join(','), ...lines].join('\n'), 'text/csv');
-  }
   function renderCotiAdmin() {
     const c = cotisation();
     const f = $('#coti-admin-form');
@@ -1905,12 +1623,12 @@
     if (!isAdmin) return;
     // Ne pas écraser un champ en cours de saisie
     const active = document.activeElement;
-    if (active && active.matches('#admin-app [data-member], #admin-app [data-qty], #admin-app [data-food], #admin-app [data-product], #admin-app [data-partner], #admin-app [data-prize], #admin-app [data-goodie], #admin-app [data-perk], #admin-app [data-menu], #admin-app [data-ing]')) return;
-    renderKpis(); renderOverview(); renderStock(); renderMenus(); renderEmails(); renderFoodAdmin(); renderShopAdmin(); renderOrdersAdmin(); renderCotiAdmin(); renderSoutienAdmin(); renderAdhAdmin(); renderContestAdmin(); renderPartnersAdmin(); renderEventsAdmin(); renderMembersAdmin(); renderSettings();
+    if (active && active.matches('#admin-app [data-member], #admin-app [data-qty], #admin-app [data-food], #admin-app [data-partner], #admin-app [data-prize], #admin-app [data-goodie], #admin-app [data-perk], #admin-app [data-menu], #admin-app [data-ing]')) return;
+    renderKpis(); renderOverview(); renderStock(); renderMenus(); renderEmails(); renderFoodAdmin(); renderCotiAdmin(); renderSoutienAdmin(); renderAdhAdmin(); renderContestAdmin(); renderPartnersAdmin(); renderEventsAdmin(); renderMembersAdmin(); renderSettings();
   }
 
   function renderPublic() {
-    renderHeader(); renderHeroFacts(); renderDays(); renderAgenda(); renderFoodGrid(); renderMembersPublic(); renderShop(); renderCotisation(); renderSoutien(); renderContest(); renderPartners(); renderQuick();
+    renderHeader(); renderHeroFacts(); renderDays(); renderAgenda(); renderFoodGrid(); renderMembersPublic(); renderCotisation(); renderSoutien(); renderContest(); renderPartners(); renderQuick();
   }
   function renderAll() { renderPublic(); renderAdmin(); }
 
@@ -2064,7 +1782,6 @@
     btn.disabled = false;
   });
   ['#coti-search', '#soutien-search'].forEach((sel) => $(sel).addEventListener('input', renderAdhAdmin));
-  $('#order-search').addEventListener('input', renderOrdersAdmin);
   $('#conc-search').addEventListener('input', renderInscrits);
   function adhCsv(sheet) {
     const cols = sheet === 'cotisations'
@@ -2129,22 +1846,12 @@
     if (delPhoto) {
       e.stopPropagation();
       const kind = delPhoto.dataset.delPhoto;
-      const owner = kind === 'product' ? findIn('products', delPhoto.dataset.id)
-        : kind === 'goodie' ? goodies().find((x) => x.id === delPhoto.dataset.id)
+      const owner = kind === 'goodie' ? goodies().find((x) => x.id === delPhoto.dataset.id)
           : (data.partners || []).find((x) => x.id === delPhoto.dataset.id);
       if (owner && confirm('Retirer cette photo ?')) { owner.photos.splice(Number(delPhoto.dataset.index), 1); save(); }
       return;
     }
-    if (t.dataset.move) {
-      const i = data.products.findIndex((x) => x.id === t.dataset.id); const j = i + Number(t.dataset.move);
-      if (i >= 0 && j >= 0 && j < data.products.length) { [data.products[i], data.products[j]] = [data.products[j], data.products[i]]; save(); }
-      return;
-    }
     if (t.dataset.adhRefresh !== undefined) { loadAdhesions(); return; }
-    if (t.dataset.ordersRefresh !== undefined) { loadOrders(); return; }
-    if (t.dataset.ordersCsv !== undefined) { ordersCsv(); return; }
-    if (t.dataset.orderDel !== undefined) { deleteOrder(t.dataset.id); return; }
-    if (t.dataset.ofilter) { ord.filter = t.dataset.ofilter; renderOrdersAdmin(); return; }
     if (t.dataset.concRefresh !== undefined) { loadInscrits(); return; }
     if (t.dataset.concCsv !== undefined) { concCsv(); return; }
     if (t.dataset.concDraw !== undefined) { drawWinner(); return; }
@@ -2171,7 +1878,7 @@
       const m = findIn('members', t.dataset.id); m.status = t.dataset.mstatus; m.updatedAt = new Date().toISOString(); save(); return;
     }
     if (t.dataset.del) {
-      const map = { stock: 'stock', food: 'food', event: 'events', member: 'members', campaign: 'campaigns', product: 'products' };
+      const map = { stock: 'stock', food: 'food', event: 'events', member: 'members', campaign: 'campaigns' };
       if (!confirm('Supprimer cet élément ?')) return;
       if (t.dataset.del === 'sub') data.subscribers = data.subscribers.filter((s) => s.email !== t.dataset.id);
       else data[map[t.dataset.del]] = data[map[t.dataset.del]].filter((x) => x.id !== t.dataset.id);
@@ -2210,14 +1917,12 @@
         const id = t.dataset.id;
         const note = $(`#up-${id}`) || $('#contest-admin-status');
         try {
-          const folder = { product: 'commande', prize: 'lot', goodie: 'goodie', perk: 'cadeau' }[t.dataset.upload] || 'partenaire';
+          const folder = { prize: 'lot', goodie: 'goodie', perk: 'cadeau' }[t.dataset.upload] || 'partenaire';
           const files = await storeImages(t.files, folder, note);
           if (t.dataset.upload === 'goodie') {
             const g = goodies().find((x) => x.id === id); g.photos = [...(g.photos || []), ...files];
           } else if (t.dataset.upload === 'perk') {
             data.cotisation = { ...cotisation(), perks: (cotisation().perks || []).map((x) => (x.id === id ? { ...x, photo: files[0] } : x)) };
-          } else if (t.dataset.upload === 'product') {
-            const x = findIn('products', id); x.photos = [...(x.photos || []), ...files];
           } else if (t.dataset.upload === 'prize') {
             data.contest = { ...contest(), prizes: (contest().prizes || []).map((x) => (x.id === id ? { ...x, photo: files[0] } : x)) };
           } else {
@@ -2248,37 +1953,11 @@
       data.contest = { ...contest(), prizes: (contest().prizes || []).map((x) => (x.id === t.dataset.prize ? { ...x, name: t.value } : x)) };
       t.blur(); save(); return;
     }
-    if (t.dataset.product) {
-      const x = findIn('products', t.dataset.product);
-      x[t.dataset.field] = t.type === 'checkbox' ? t.checked : t.type === 'number' ? Math.max(1, Number(t.value) || 1) : t.value.trim();
-      t.blur(); save(); return;
-    }
     if (t.dataset.qty) { findIn('stock', t.dataset.qty).quantity = Math.max(0, Number(t.value) || 0); t.blur(); save(); }
     if (t.dataset.food) { findIn('food', t.dataset.food)[t.dataset.field] = Math.max(0, Number(t.value) || 0); t.blur(); save(); }
     if (t.dataset.member) {
       const m = findIn('members', t.dataset.member); m[t.dataset.field] = t.value; m.updatedAt = new Date().toISOString(); t.blur(); save();
     }
-  });
-
-  $('#shop-form').addEventListener('submit', (e) => {
-    e.preventDefault();
-    const f = e.target;
-    data.config = { ...data.config, ordersOpen: f.ordersOpen.checked, orderWebhook: f.orderWebhook.value.trim(), deliveryNote: f.deliveryNote.value.trim(), shopIntro: f.shopIntro.value.trim() };
-    save();
-    $('#shop-status').textContent = token() ? 'Enregistré et publié.' : 'Enregistré sur cet appareil.';
-    ord.at = null; loadOrders();
-  });
-  $('#product-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const f = e.target;
-    const btn = f.querySelector('button[type=submit]'); btn.disabled = true;
-    try {
-      const photos = await storeImages(f.photos.files, 'commande', $('#product-status'));
-      if (!Array.isArray(data.products)) data.products = [];
-      data.products.push({ id: uid('p'), name: f.name.value.trim(), category: f.category.value.trim() || 'Autres', desc: f.desc.value.trim(), max: Math.max(1, Number(f.max.value) || 1), available: true, photos });
-      f.reset(); save();
-    } catch (err) { $('#product-status').textContent = err.message; }
-    btn.disabled = false;
   });
 
   $('#settings-form').addEventListener('submit', async (e) => {
@@ -2397,7 +2076,6 @@
   // ouvrir l'onglet recharge déjà les données.
   const ADMIN_REFRESH = 10 * 60 * 1000;
   setInterval(() => { if (isAdmin && !document.hidden && (currentTab === 'cotisations' || currentTab === 'soutien')) loadAdhesions(); }, ADMIN_REFRESH);
-  setInterval(() => { if (isAdmin && !document.hidden && currentTab === 'shop') loadOrders(); }, ADMIN_REFRESH);
   setInterval(() => { if (isAdmin && !document.hidden && currentTab === 'contest') loadInscrits(); }, ADMIN_REFRESH);
 
   renderAll();

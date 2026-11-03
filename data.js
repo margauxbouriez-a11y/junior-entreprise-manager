@@ -12,14 +12,10 @@ window.JE_DATA = {
     "github": {
       "owner": "margauxbouriez-a11y",
       "repo": "junior-entreprise-manager",
-      "branch": "main",
+      "branch": "sans-boutique",
       "path": "data.js"
     },
-    "orderWebhook": "https://margauxbouriez2.app.n8n.cloud/webhook/leclercq-commandes",
-    "ordersOpen": true,
-    "deliveryNote": "Livraison offerte en chambre ou au stand, sur le campus.",
-    "adhesionsWebhook": "https://margauxbouriez2.app.n8n.cloud/webhook/leclercq-adhesions",
-    "shopIntro": ""
+    "adhesionsWebhook": "https://margauxbouriez2.app.n8n.cloud/webhook/leclercq-adhesions"
   },
   "members": [
     {
@@ -594,44 +590,6 @@ window.JE_DATA = {
     }
   ],
   "publishedAt": "2026-11-02T13:46:10.928Z",
-  "products": [
-    {
-      "id": "p2",
-      "name": "Café",
-      "category": "Boissons",
-      "desc": "Expresso ou allongé, à préciser.",
-      "max": 2,
-      "available": true,
-      "photos": []
-    },
-    {
-      "id": "p3",
-      "name": "Jus de fruits",
-      "category": "Boissons",
-      "desc": "Orange ou multifruit.",
-      "max": 2,
-      "available": true,
-      "photos": []
-    },
-    {
-      "id": "p4",
-      "name": "Crêpe sucre",
-      "category": "Food",
-      "desc": "La classique.",
-      "max": 2,
-      "available": true,
-      "photos": []
-    },
-    {
-      "id": "p5",
-      "name": "Crêpe Nutella",
-      "category": "Food",
-      "desc": "Généreusement garnie.",
-      "max": 2,
-      "available": true,
-      "photos": []
-    }
-  ],
   "partners": [
     {
       "id": "pa1",
@@ -886,4 +844,5 @@ window.JE_DATA = {
     }
   ]
 };
+
 window.JE_PRIVATE = {"v":1,"salt":"HWCvKBORz+fylxMl7SmkrQ==","iv":"/wqZS0K/kGdNA0ae","data":"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"};

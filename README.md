@@ -5,13 +5,17 @@ Site de campagne de la liste **Leclercq des étoiles** (HEC Paris), thème « gu
 Site statique : aucun serveur ni installation. Ouvrez `index.html` dans un navigateur, ou publiez le dépôt avec GitHub Pages (Settings → Pages → Deploy from a branch → `main` / `(root)`).
 Adresse une fois publiée : https://leclercqdesetoiles.xyz/
 
+## Branche `sans-boutique` (version publiée pour l'instant)
+Cette branche est le site **sans la boutique ni les commandes** : plus de section « Commander », de panier, d'onglet Boutique dans l'Espace liste, ni de workflow n8n des commandes. La publication automatique de l'Espace liste écrit sur cette branche (`config.github.branch` dans `data.js`).
+Pour la mettre en ligne : GitHub → Settings → Pages → Branch : **sans-boutique** / `(root)` → Save. Pour revenir à la version avec boutique, choisir à nouveau **main**.
+
 ## Fichiers
 - `data.js` — le contenu du site. Il est mis à jour automatiquement depuis l'Espace liste (voir plus bas). La partie publique (programme, food, équipe…) est lisible ; la partie privée (stocks, menus, abonnés) est chiffrée.
 - `index.html` — la mise en page et les textes fixes.
 - `app.js` — le fonctionnement.
 
 ## Face étudiants
-- **Accueil** : le logo et le message de la campagne, puis « Comment ça marche » : les 4 usages du site (Programme, Food, Boutique, Équipe) avec une info en direct pour chacun.
+- **Accueil** : le logo et le message de la campagne, puis « Comment ça marche » : les 4 usages du site (Programme, Food, Jeu concours, Équipe) avec une info en direct pour chacun.
 - Le logo est dans `assets/` (`logo.jpg`, `logo-180.png`, `favicon.png`) : remplacez ces fichiers pour le changer.
 - **Programme** : les 2 semaines de campagne jour par jour (événements + stands food).
 - **Food** : chaque stand avec la date, le lieu, le prix et une jauge des portions restantes.
@@ -55,7 +59,6 @@ Code d'accès par défaut : `leclercq2026` (modifiable dans Réglages). Il chiff
   - Le tableau « Ingrédients nécessaires » et la liste de courses de « Stocks food » ajoutent ce qu'il faut acheter pour les menus ; chaque carte de stock affiche la quantité prévue dans les menus.
   - Les menus sont dans la partie privée (chiffrée) de `data.js`, comme les stocks, et se publient automatiquement.
 - **Où sont les membres** : une carte par membre ; un clic pour changer de statut (Disponible, Occupé·e, En pause, Absent·e), un champ pour la position (avec suggestions des lieux connus), et l'heure de la dernière mise à jour.
-- **Boutique** : le tableau des **commandes** reçues (case **Livrée**, recherche, filtres, export CSV), le catalogue des articles offerts, limite par commande, disponibilité, ouverture ou fermeture de la boutique.
 - **Cotisations** : le tableau de tous les cotisants (prénom, nom, chambre, photo de preuve à ouvrir en grand) avec une case **Sac livré** à cocher, une recherche, un filtre « Sac à livrer » et un export CSV. On y modifie aussi ce que gagnent les cotisants (nom, description, photo) et la connexion n8n.
 - **Soutien actif** : le tableau des demandes (prénom, nom, goodies voulus) avec une case **Donné** à cocher, le total demandé / donné pour chaque goodie, et la gestion des goodies proposés (nom, description, photos, disponible ou épuisé).
 - **Jeu concours** : titre, texte, date de fin, règlement, ouverture des inscriptions, lots avec photo, et nombre d'inscrits en direct.
@@ -81,23 +84,6 @@ Si deux membres modifient en même temps, leurs changements sont fusionnés auto
 Sans clé, les modifications restent sur l'appareil ; le bouton **Exporter data.js** permet alors de publier à la main (remplacer `data.js` sur GitHub).
 
 **Données privées :** dans `data.js`, les stocks, les abonnés et les campagnes e-mail sont **chiffrés avec le code d'accès** de l'Espace liste (`leclercq2026` par défaut, à changer dans Réglages, 8 caractères minimum). Sans le code, ces données sont illisibles, même en ouvrant le fichier. Si vous changez le code, prévenez tous les membres. Si vous le perdez, la partie privée est perdue.
-
-## Boutique : commandes offertes (boissons, crêpes, ménage…) via n8n
-Dans la section **Commander**, les étudiants ajoutent des articles à leur commande, en respectant une limite par article (par exemple 2 Red Bull au maximum), puis indiquent où les livrer et valident. **Tout est offert, il n'y a aucun paiement.** Chaque commande reçoit un numéro (`LQ-1015-4821`) et part vers un webhook n8n qui **la garde lui-même** (dans la mémoire du workflow). **Aucun e-mail n'est envoyé**, ni à la liste ni à l'étudiant.
-
-**Voir et livrer les commandes :** Espace liste → onglet **Boutique** → tableau **Les commandes** : numéro, heure, nom, articles, lieu et créneau, téléphone (cliquable pour appeler), précisions, case **Livrée** à cocher, recherche, filtres « À livrer / Livrées / Toutes », bouton pour supprimer une ligne et **Exporter CSV**. Le tableau s'actualise chaque minute. Il utilise la **même clé secrète** que les cotisations (Espace liste → Cotisations → Connexion n8n).
-
-**Gérer les propositions :** Espace liste → onglet **Boutique**. Chaque proposition est une carte modifiable : nom, catégorie, description, maximum par commande, « Disponible » (sinon elle apparaît « Épuisé »), ordre d'affichage (↑ ↓), et **photos** de ce que les gens commandent (la première sert de vignette sur la boutique, les autres se voient en cliquant dessus). On peut aussi ouvrir ou fermer toute la boutique et modifier le texte d'introduction.
-
-**Brancher n8n (déjà fait pour la campagne actuelle) :**
-1. Dans n8n : **Create workflow → ⋯ → Import from File**, puis choisissez `n8n/commandes-workflow.json`.
-2. Ouvrez le nœud **Vérifier la clé et répondre** et remplacez `CHANGEZ-MOI` par la même clé secrète que pour les cotisations.
-3. **Save**, puis **Publish**. Copiez la **Production URL** du nœud « Commande reçue » (elle finit par `/webhook/leclercq-commandes`, et non `leclercq-adhesions`).
-4. Sur le site : **Espace liste → Boutique → Webhook des commandes**, collez l'URL, puis **Enregistrer**.
-
-⚠️ Comme pour les cotisations, la liste vit dans le workflow : ne le supprimez pas et ne le réimportez pas par-dessus. Les essais avec « Test workflow » ne sont pas enregistrés. Pensez à faire **Exporter CSV** de temps en temps.
-
-Tant qu'aucun webhook n'est réglé, la commande ouvre la messagerie de l'étudiant vers l'e-mail de contact de la liste. Sans e-mail de contact non plus, le site indique que les commandes ne sont pas encore ouvertes.
 
 ## Jeu concours via n8n (sans Google Sheet)
 Les inscriptions partent vers un webhook n8n qui **garde la liste lui-même** (dans la mémoire du workflow), comme pour les cotisations. S'inscrire deux fois avec la même adresse e-mail ne compte qu'une fois. Le site affiche le nombre d'inscrits en direct, mis à jour chaque minute.
