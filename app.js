@@ -1043,6 +1043,10 @@
   $('#login-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const form = e.target;
+    if (!window.isSecureContext || !(window.crypto && crypto.subtle)) {
+      $('#login-status').textContent = "L'Espace liste ne s'ouvre qu'en connexion sécurisée (adresse en https://). Ouvrez https://leclercqdesetoiles.xyz dès que le cadenas est disponible.";
+      return;
+    }
     $('#login-status').textContent = 'Vérification…';
     try {
       await login(form.code.value);
