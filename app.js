@@ -734,14 +734,27 @@
     $('#contest-count').textContent = contestCount == null ? '—' : num(contestCount);
     $('#contest-count-label').textContent = contestCount === 1 ? 'inscrit' : 'inscrits';
   }
-  async function refreshContestCount() {
+  // Chaque appel au compteur coûte une exécution n8n (quota mensuel limité).
+  // On le demande donc au plus une fois toutes les 15 minutes par visiteur,
+  // et seulement quand le jeu concours est affiché et encore ouvert.
+  const COUNT_CACHE = 'leclercq-contest-count';
+  const COUNT_TTL = 15 * 60 * 1000;
+  const cachedCount = () => { try { const c = JSON.parse(storage.get(COUNT_CACHE) || 'null'); return c && typeof c.count === 'number' && c.url === countUrl() ? c : null; } catch { return null; } };
+  const saveCount = (n) => storage.set(COUNT_CACHE, JSON.stringify({ count: n, at: Date.now(), url: countUrl() }));
+  async function refreshContestCount(force = false) {
     const url = countUrl();
-    if (!url) { contestCount = null; return; }
-    try {
-      const res = await fetch(`${url}?t=${Date.now()}`, { cache: 'no-store' });
-      const json = await res.json();
-      if (typeof json.count === 'number') contestCount = json.count;
-    } catch { /* n8n injoignable : on garde la dernière valeur */ }
+    if (!url || !contest().title) { contestCount = null; return; }
+    const cached = cachedCount();
+    if (cached) contestCount = cached.count;
+    const fresh = cached && Date.now() - cached.at < COUNT_TTL;
+    const ended = contestState() === 'ended' && cached;
+    if (force || !(fresh || ended)) {
+      try {
+        const res = await fetch(`${url}?t=${Date.now()}`, { cache: 'no-store' });
+        const json = await res.json();
+        if (typeof json.count === 'number') { contestCount = json.count; saveCount(contestCount); }
+      } catch { /* n8n injoignable : on garde la dernière valeur */ }
+    }
     if ($('#contest-count')) { $('#contest-count').textContent = contestCount == null ? '—' : num(contestCount); }
     if ($('#contest-admin-count')) $('#contest-admin-count').textContent = contestCount == null ? '—' : num(contestCount);
   }
@@ -758,7 +771,7 @@
     try {
       const res = await postToWebhook(contest().webhook, payload);
       if (res && res.ok === false) throw new Error(res.error || 'refus');
-      if (typeof res.count === 'number') contestCount = res.count;
+      if (typeof res.count === 'number') { contestCount = res.count; saveCount(contestCount); }
       storage.set(contestKey(), payload.email);
       form.reset(); status.textContent = '';
       renderContest();
@@ -1568,7 +1581,7 @@
     try {
       const res = await concRequest({ action: 'list' });
       conc.rows = Array.isArray(res.inscrits) ? res.inscrits : [];
-      contestCount = conc.rows.length;
+      contestCount = conc.rows.length; saveCount(contestCount);
       conc.error = ''; conc.at = new Date();
     } catch (err) { conc.error = err.message; }
     conc.loading = false; renderInscrits();
@@ -1971,7 +1984,7 @@
     const f = e.target;
     data.contest = { ...contest(), open: f.open.checked, title: f.title.value.trim(), desc: f.desc.value.trim(), endsAt: f.endsAt.value,
       rules: f.rules.value.trim(), webhook: f.webhook.value.trim() };
-    save(); refreshContestCount(); conc.at = null; loadInscrits();
+    save(); refreshContestCount(true); conc.at = null; loadInscrits();
     $('#contest-admin-status').textContent = token() ? 'Enregistré et publié.' : 'Enregistré sur cet appareil.';
   });
   $('#contest-refresh').addEventListener('click', refreshContestCount);
@@ -2376,11 +2389,16 @@
   // Le bloc « En ce moment » et le programme du jour suivent l'heure
   setInterval(() => { if (view === 'public') { renderAgenda(); renderQuick(); } }, 60000);
   setInterval(() => { if (view === 'public' && !document.hidden) renderCountdown(); }, 1000);
+  // Appels n8n : chacun coûte une exécution sur le quota mensuel.
+  // Compteur public : à l'ouverture (cache 15 min) et au retour sur l'onglet, plus de rafraîchissement chaque minute.
   refreshContestCount();
-  setInterval(() => { if (!document.hidden) refreshContestCount(); }, 60000);
-  setInterval(() => { if (isAdmin && !document.hidden && (currentTab === 'cotisations' || currentTab === 'soutien')) loadAdhesions(); }, 60000);
-  setInterval(() => { if (isAdmin && !document.hidden && currentTab === 'shop') loadOrders(); }, 60000);
-  setInterval(() => { if (isAdmin && !document.hidden && currentTab === 'contest') loadInscrits(); }, 60000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshContestCount(); });
+  // Espace liste : rafraîchissement automatique toutes les 10 minutes (au lieu de chaque minute) ;
+  // ouvrir l'onglet recharge déjà les données.
+  const ADMIN_REFRESH = 10 * 60 * 1000;
+  setInterval(() => { if (isAdmin && !document.hidden && (currentTab === 'cotisations' || currentTab === 'soutien')) loadAdhesions(); }, ADMIN_REFRESH);
+  setInterval(() => { if (isAdmin && !document.hidden && currentTab === 'shop') loadOrders(); }, ADMIN_REFRESH);
+  setInterval(() => { if (isAdmin && !document.hidden && currentTab === 'contest') loadInscrits(); }, ADMIN_REFRESH);
 
   renderAll();
   setView(view);

@@ -5,7 +5,7 @@
    - Les envois (commandes, cotisations, concours, publication GitHub) ne passent
      jamais par ici : seules les lectures GET de ce site et des polices sont gérées.
    Changer VERSION force le renouvellement du cache sur tous les téléphones. */
-const VERSION = 'v1';
+const VERSION = 'v2';
 const CACHE = `leclercq-${VERSION}`;
 const FONTS = `leclercq-fonts-${VERSION}`;
 
